@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Bazzitttte Kodi
+Comment=Boot into Kodi fullscreen over the Plasma session
+Exec=kodi --fullscreen
+Terminal=false
+X-KDE-autostart-after=panel

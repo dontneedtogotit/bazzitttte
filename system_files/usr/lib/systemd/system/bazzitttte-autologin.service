@@ -1,0 +1,12 @@
+[Unit]
+Description=Bazzitttte autologin setup
+ConditionPathExists=!/etc/sddm.conf.d/zz-bazzitttte-autologin.conf
+ConditionPathExists=!/etc/bazzitttte/autologin-disabled
+Before=display-manager.service sddm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/bazzitttte-autologin
+
+[Install]
+WantedBy=multi-user.target

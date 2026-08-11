@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# bazzitttte: set up SDDM autologin for the first regular user on the NUC.
+# Runs once at boot (guarded by ConditionPathExists in the unit).
+
+set -euo pipefail
+
+USER_NAME=$(awk -F: '($3 >= 1000 && $3 < 60000) { print $1; exit }' /etc/passwd)
+
+if [[ -z "${USER_NAME}" ]]; then
+    echo "No regular user found, skipping autologin" >&2
+    exit 0
+fi
+
+# Detect Plasma Wayland session name for SDDM (SDDM expects name without .desktop extension)
+SESSION_NAME="plasma"
+if [[ -f /usr/share/wayland-sessions/plasmawayland.desktop ]]; then
+    SESSION_NAME="plasmawayland"
+elif [[ -f /usr/share/wayland-sessions/plasma.desktop ]]; then
+    SESSION_NAME="plasma"
+fi
+
+mkdir -p /etc/sddm.conf.d
+cat > /etc/sddm.conf.d/zz-bazzitttte-autologin.conf <<EOF
+[Autologin]
+Session=${SESSION_NAME}
+User=${USER_NAME}
+EOF
+
+echo "Autologin enabled for ${USER_NAME} (${SESSION_NAME} Wayland)"
+

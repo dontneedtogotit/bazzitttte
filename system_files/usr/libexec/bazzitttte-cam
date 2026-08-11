@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# bazzitttte-cam: network-camera PiP viewer + motion popup for the NUC.
+#
+# Cameras are defined in /etc/bazzitttte/cameras.conf, one per line:
+#   <name> <stream-url> [motion-threshold]
+# e.g.
+#   frontdoor rtsp://192.168.1.50:554/stream1
+#   backyard  rtsp://user:pass@192.168.1.51:554/live 12
+#
+# Subcommands:
+#   list                 show configured cameras
+#   pip <name>           show a small always-on-top PiP of <name> (mpv)
+#   stop [name]          hide PiP (all cameras if name omitted)
+#   watch <name>         monitor <name> and pop the PiP up on motion
+#   unwatch <name>       stop the motion watcher for <name>
+#
+# Tuning (environment, optional):
+#   CAM_FPS            frames/sec analysed for motion   (default 2)
+#   CAM_WIDTH          analysis width in px             (default 320)
+#   CAM_THRESHOLD      motion sensitivity, higher=less  (default 10)
+#   CAM_POPUP_SECONDS  how long a motion popup stays    (default 15)
+#   CAM_COOLDOWN       seconds between popups           (default 30)
+#   CAM_PIP_POS        mpv --geometry corner            (default -10-10 = bottom-right)
+#   CAM_PIP_SIZE       mpv --autofit size               (default 320x180)
+#   CAM_HWACCEL        "vaapi" to GPU-decode (lower CPU) or "software" (default software
+#                      for maximum stream compatibility; set vaapi to lighten the 2-core CPU)
+
+set -euo pipefail
+
+CONF="/etc/bazzitttte/cameras.conf"
+RUNDIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+FPS="${CAM_FPS:-2}"
+WIDTH="${CAM_WIDTH:-320}"
+THRESHOLD="${CAM_THRESHOLD:-10}"
+POPUP_SECONDS="${CAM_POPUP_SECONDS:-15}"
+COOLDOWN="${CAM_COOLDOWN:-30}"
+PIP_POS="${CAM_PIP_POS:--10-10}"
+PIP_SIZE="${CAM_PIP_SIZE:-320x180}"
+HWACCEL="${CAM_HWACCEL:-software}"
+
+die() { echo "bazzitttte-cam: $*" >&2; exit 1; }
+
+cam_url() { awk -v n="$1" '$1==n {print $2; exit}' "$CONF" 2>/dev/null; }
+cam_threshold() { awk -v n="$1" '$1==n {print $3; exit}' "$CONF" 2>/dev/null; }
+
+require_cam() {
+    [[ -f "$CONF" ]] || die "no $CONF - add your cameras there first (see comments in it)"
+    local url
+    url="$(cam_url "$1")"
+    [[ -n "$url" ]] || die "camera '$1' not found in $CONF (available: $(awk '$1!~/^#/{printf "%s ",$1}' "$CONF"))"
+    echo "$url"
+}
+
+pip_title() { echo "bazzitttte-cam-$1"; }
+
+start_pip() {
+    local name="$1" url="$2"
+    if pgrep -f "$(pip_title "$name")" >/dev/null 2>&1; then
+        echo "PiP for '$name' already showing."
+        return 0
+    fi
+    nohup mpv --no-terminal --profile=low-latency --rtsp-transport=tcp \
+        --hwdec=auto --ontop --no-border \
+        --geometry="$PIP_POS" --autofit="$PIP_SIZE" \
+        --title="$(pip_title "$name")" "$url" >/dev/null 2>&1 &
+    echo "PiP for '$name' shown (bottom-right corner)."
+}
+
+stop_pip() {
+    local name="$1"
+    pkill -f "$(pip_title "$name")" 2>/dev/null || true
+}
+
+motion_popup() {
+    local name="$1" url="$2"
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send -a bazzitttte -u critical "Camera: ${name}" "Motion detected" 2>/dev/null || true
+    fi
+    if ! pgrep -f "$(pip_title "$name")" >/dev/null 2>&1; then
+        nohup mpv --no-terminal --profile=low-latency --rtsp-transport=tcp \
+            --hwdec=auto --ontop --no-border \
+            --geometry="$PIP_POS" --autofit="$PIP_SIZE" \
+            --title="$(pip_title "$name")" "$url" >/dev/null 2>&1 &
+        ( sleep "$POPUP_SECONDS"; stop_pip "$name" ) >/dev/null 2>&1 &
+    fi
+}
+
+process_frames() {
+    local name="$1" url="$2" thr="$3" line val now last
+    while IFS= read -r line; do
+        case "$line" in
+        *"lavfi.signalstats.YAVG="*)
+            val="${line##*YAVG=}"
+            val="${val%%[!0-9.]*}"
+            [[ -n "$val" ]] || continue
+            if awk -v v="$val" -v t="$thr" 'BEGIN{exit !(v+0 > t+0)}'; then
+                now="$(date +%s)"
+                last="$(cat "${RUNDIR}/cam-motion-${name}" 2>/dev/null || echo 0)"
+                if ((now - last >= COOLDOWN)); then
+                    echo "$now" >"${RUNDIR}/cam-motion-${name}"
+                    echo "[bazzitttte-cam] motion on '$name' (delta=${val} > ${thr})"
+                    motion_popup "$name" "$url"
+                fi
+            fi
+            ;;
+        esac
+    done
+}
+
+watch_loop() {
+    local name="$1" url="$2" thr="$3"
+    local -a dec=()
+    local vffilter
+    if [[ "$HWACCEL" == "vaapi" ]]; then
+        dec=(-hwaccel vaapi -hwaccel_device /dev/dri/renderD128 -hwaccel_output_format vaapi)
+        vffilter="hwdownload,format=nv12,fps=${FPS},scale=${WIDTH}:-1,format=yuv420p,tblend=all_mode=difference,signalstats,metadata=print:file=-"
+    else
+        vffilter="fps=${FPS},scale=${WIDTH}:-1,format=yuv420p,tblend=all_mode=difference,signalstats,metadata=print:file=-"
+    fi
+    echo "[bazzitttte-cam] watching '$name' (threshold=${thr}, popup=${POPUP_SECONDS}s, cooldown=${COOLDOWN}s, decode=${HWACCEL}). Ctrl+C to stop."
+    while true; do
+        ffmpeg -hide_banner -nostats "${dec[@]}" -rtsp_transport tcp -i "$url" \
+            -vf "$vffilter" \
+            -f null - 2>/dev/null | process_frames "$name" "$url" "$thr"
+        echo "[bazzitttte-cam] stream '$name' dropped; retrying in 3s..."
+        sleep 3
+    done
+}
+
+cmd="${1:-list}"
+case "$cmd" in
+list)
+    if [[ -f "$CONF" ]]; then
+        awk '$1 !~ /^#/ && NF>=2 {printf "  %-16s %s\n", $1, $2}' "$CONF"
+    else
+        echo "No $CONF yet."
+    fi
+    ;;
+pip)
+    [[ $# -ge 2 ]] || die "usage: bazzitttte-cam pip <name>"
+    url="$(require_cam "$2")"
+    start_pip "$2" "$url"
+    ;;
+stop)
+    if [[ $# -ge 2 ]]; then
+        stop_pip "$2"
+    else
+        pkill -f "bazzitttte-cam-" 2>/dev/null || true
+    fi
+    echo "PiP hidden."
+    ;;
+watch)
+    [[ $# -ge 2 ]] || die "usage: bazzitttte-cam watch <name>"
+    url="$(require_cam "$2")"
+    thr="$(cam_threshold "$2")"
+    [[ -n "$thr" ]] || thr="$THRESHOLD"
+    watch_loop "$2" "$url" "$thr"
+    ;;
+unwatch)
+    [[ $# -ge 2 ]] || die "usage: bazzitttte-cam unwatch <name>"
+    pkill -f "bazzitttte-cam watch $2" 2>/dev/null || true
+    url="$(cam_url "$2" || true)"
+    if [[ -n "$url" ]]; then
+        pkill -f "$url" 2>/dev/null || true
+    fi
+    echo "Watcher for '$2' stopped."
+    ;;
+*)
+    die "unknown command '$cmd' (list|pip|stop|watch|unwatch)"
+    ;;
+esac

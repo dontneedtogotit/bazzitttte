@@ -1,0 +1,22 @@
+[Unit]
+Description=AdGuard Home - network-wide DNS ad blocker (bazzitttte)
+Documentation=https://github.com/AdguardTeam/AdGuardHome
+
+[Container]
+Image=docker.io/adguard/adguardhome:latest
+ContainerName=adguardhome
+# DNS must answer on the host's LAN address, so use host networking.
+Network=host
+# Persist config + working data across image updates (named volumes live in /var).
+Volume=adguardhome-conf:/opt/adguardhome/conf
+Volume=adguardhome-work:/opt/adguardhome/work
+AutoUpdate=registry
+
+[Service]
+Restart=on-failure
+# Pulling/starting can take a bit on first run.
+TimeoutStartSec=300
+
+# NOTE: intentionally no [Install] section -> this is OPT-IN and does NOT
+# auto-start at boot. Start it with: ujust bazzitttte-adguard start
+# (Binding port 53 can conflict with systemd-resolved; see the recipe output.)
