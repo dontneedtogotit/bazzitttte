@@ -2,7 +2,7 @@
 
 Custom [bootc](https://bootc.dev/) image based on **Bazzite Desktop (KDE)** for the **Intel NUC7i5BNH** (Core i5-7260U, Iris Plus 640, 16 GB RAM).
 
-Derived from the [Universal Blue image template](https://github.com/ublue-os/image-template). Builds and publishes to GHCR via GitHub Actions as `ghcr.io/getoffover/bazzitttte`.
+Derived from the [Universal Blue image template](https://github.com/ublue-os/image-template). Builds and publishes to GHCR via GitHub Actions as `ghcr.io/dontneedtogotit/bazzitttte`.
 
 ## What's baked in
 
@@ -40,7 +40,7 @@ Bazzite itself already brings full codecs, HDR, VRR, MangoHud, Flatpak/Flathub, 
 | `bazzitttte.env` | Image name, org, labels used by the `Justfile`. |
 | `.github/workflows/build.yml` | Builds the OCI image on push/schedule/PR. |
 | `.github/workflows/build-disk.yml` | Builds qcow2/anaconda-iso installers on demand. |
-| `disk_config/` | Disk-image build config; the ISO kickstart rebases to `ghcr.io/getoffover/bazzitttte:latest`. |
+| `disk_config/` | Disk-image build config; the ISO kickstart rebases to `ghcr.io/dontneedtogotit/bazzitttte:latest`. |
 
 ## First-time setup (GitHub)
 
@@ -53,7 +53,7 @@ Bazzite itself already brings full codecs, HDR, VRR, MangoHud, Flatpak/Flathub, 
    ```bash
    gh secret set SIGNING_SECRET < cosign.key
    ```
-3. Push to a repo named `bazzitttte` under `getoffover`, then enable Actions on the repo.
+3. Push to a repo named `bazzitttte` under `dontneedtogotit`, then enable Actions on the repo.
 4. (Optional) On the NUC, for a UEFI install ISO, run the `build-disk.yml` workflow (`anaconda-iso`) and grab the artifact.
 
 ## Installing / updating on the NUC
@@ -61,7 +61,7 @@ Bazzite itself already brings full codecs, HDR, VRR, MangoHud, Flatpak/Flathub, 
 Rebase from stock Bazzite (or another Fedora Atomic) to the custom image:
 
 ```bash
-sudo bootc switch ghcr.io/getoffover/bazzitttte:latest
+sudo bootc switch ghcr.io/dontneedtogotit/bazzitttte:latest
 sudo reboot
 ```
 
