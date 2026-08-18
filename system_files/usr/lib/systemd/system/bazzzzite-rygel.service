@@ -1,0 +1,11 @@
+[Unit]
+Description=Bazzzzite Rygel DLNA/UPnP Renderer
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/rygel
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

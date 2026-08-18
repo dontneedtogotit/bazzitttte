@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""
+bazzzzite-voice: offline voice control daemon using Vosk.
+Listens for wake word "hey tv" or "bazzzzite", then parses commands.
+Commands: play <query>, pause, stop, volume up, volume down, home, back, reboot, shutdown
+"""
+
+import json
+import os
+import queue
+import subprocess
+import sys
+import websockets
+import asyncio
+
+MODEL_DIR = "/usr/share/vosk-models/vosk-model-small-en-us-0.15"
+WS_URL = "ws://localhost:8080/ws"
+WAKE_WORDS = {"hey tv", "bazzzzite", "hey bazzzzite"}
+
+COMMANDS = {
+    "pause": "mpv_pause",
+    "stop": "mpv_stop",
+    "home": "home",
+    "back": "back",
+    "reboot": "system_reboot",
+    "shutdown": "system_shutdown",
+    "volume up": "volume_up",
+    "volume down": "volume_down",
+    "volume mute": "volume_mute",
+}
+
+
+def find_model():
+    if os.path.exists(MODEL_DIR):
+        return MODEL_DIR
+    for root, dirs, files in os.walk("/usr/share"):
+        for d in dirs:
+            if d.startswith("vosk-model"):
+                return os.path.join(root, d)
+    return None
+
+
+async def voice_loop():
+    model_path = find_model()
+    if not model_path:
+        print("Vosk model not found. Install vosk and a model.")
+        return
+
+    try:
+        from vosk import Model, KaldiRecognizer
+    except ImportError:
+        print("python3-vosk not installed.")
+        return
+
+    model = Model(model_path)
+    rec = KaldiRecognizer(model, 16000)
+    rec.SetWords(True)
+
+    cmd = [
+        "arecord",
+        "-f", "S16_LE",
+        "-r", "16000",
+        "-c", "1",
+        "-t", "raw",
+        "-q",
+    ]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    print("Voice daemon started. Say 'hey tv' or 'bazzzzite'.")
+
+    async def connect_ws():
+        while True:
+            try:
+                return await websockets.connect(WS_URL, ping_interval=20, ping_timeout=20)
+            except Exception:
+                await asyncio.sleep(1)
+
+    ws = await connect_ws()
+    wake_active = False
+
+    try:
+        while True:
+            loop = asyncio.get_running_loop()
+            data = await loop.run_in_executor(None, proc.stdout.read, 8000)
+            if not data:
+                break
+            if rec.AcceptWaveform(data):
+                result = json.loads(rec.Result())
+                text = result.get("text", "").strip().lower()
+                if not text:
+                    continue
+                print(f"Heard: {text}")
+                if wake_active:
+                    try:
+                        await handle_command(ws, text)
+                    except Exception:
+                        ws = await connect_ws()
+                    wake_active = False
+                elif any(w in text for w in WAKE_WORDS):
+                    wake_active = True
+                    print("Wake word detected, listening for command...")
+    except Exception as e:
+        print(f"Voice error: {e}")
+    finally:
+        proc.terminate()
+        try:
+            await ws.close()
+        except Exception:
+            pass
+
+
+async def handle_command(ws, text):
+    for phrase, action in COMMANDS.items():
+        if phrase in text:
+            print(f"Command: {phrase} -> {action}")
+            await ws.send(json.dumps({"action": action}))
+            return
+    if text.startswith("play "):
+        query = text[5:].strip()
+        print(f"Searching YouTube for: {query}")
+        await ws.send(json.dumps({
+            "action": "yt_search",
+            "payload": {"query": query}
+        }))
+    elif text.startswith("launch "):
+        app = text[7:].strip()
+        print(f"Launching app: {app}")
+        await ws.send(json.dumps({
+            "action": "launch_app",
+            "payload": {"app": app}
+        }))
+
+
+def main():
+    try:
+        asyncio.run(voice_loop())
+    except KeyboardInterrupt:
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

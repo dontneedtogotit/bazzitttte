@@ -1,0 +1,565 @@
+#!/usr/bin/env python3
+"""
+bazzzzite-tv-bridge: HTTP + WebSocket server for the TV shell.
+Serves the TV shell UI and bridges between the browser and backend services:
+  - MPV IPC (video playback control)
+  - Jellyfin API proxy
+  - CEC remote events
+  - System commands (reboot, shutdown, launch apps)
+  - OS updates (bootc upgrade/rollback)
+  - Game mode (disable Cage, performance governor)
+  - YouTube search (yt-dlp)
+  - File manager
+  - Voice control (Vosk)
+  - DLNA renderer (Rygel)
+  - Settings persistence
+"""
+
+import asyncio
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+from aiohttp import web, WSMsgType
+
+SHELL_DIR = Path("/usr/share/bazzzzite/shell")
+MPV_SOCK = "/tmp/mpv.sock"
+PORT = 8080
+SETTINGS_FILE = Path("/etc/bazzzzite/settings.json")
+PROFILES_FILE = Path("/etc/bazzzzite/profiles.json")
+AUTH_TOKEN_FILE = Path("/etc/bazzzzite/ws-token")
+
+mpv_process = None
+yt_app_process = None
+ws_clients = set()
+current_profile = "default"
+
+AUTH_TOKEN = None
+if AUTH_TOKEN_FILE.exists():
+    AUTH_TOKEN = AUTH_TOKEN_FILE.read_text().strip()
+
+
+def load_settings():
+    if SETTINGS_FILE.exists():
+        try:
+            return json.loads(SETTINGS_FILE.read_text())
+        except Exception:
+            pass
+    return {
+        "scale": 1.0,
+        "voice_enabled": False,
+        "rygel_enabled": False,
+        "game_mode": False,
+        "profile": "default",
+    }
+
+
+def save_settings(settings):
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_FILE.write_text(json.dumps(settings, indent=2))
+
+
+def load_profiles():
+    if PROFILES_FILE.exists():
+        try:
+            return json.loads(PROFILES_FILE.read_text())
+        except Exception:
+            pass
+    return {
+        "default": {"name": "Default", "pin": None, "apps": ["*"]},
+        "kids": {"name": "Kids", "pin": "1234", "apps": ["jellyfin", "youtube", "emulation"]},
+    }
+
+
+settings = load_settings()
+profiles = load_profiles()
+
+
+async def broadcast(data):
+    if not ws_clients:
+        return
+    for ws in list(ws_clients):
+        try:
+            await ws.send_json(data)
+        except Exception:
+            ws_clients.discard(ws)
+
+
+def start_mpv(url=""):
+    global mpv_process
+    if mpv_process and mpv_process.poll() is None:
+        return "already running"
+    cmd = [
+        "mpv",
+        "--fullscreen",
+        "--no-border",
+        "--ontop",
+        "--osc=no",
+        "--osd-bar=no",
+        "--cache=yes",
+        "--demuxer-max-bytes=500M",
+        "--demuxer-max-back-bytes=100M",
+        "--input-ipc-server=" + MPV_SOCK,
+        "--hwdec=auto",
+        "--vo=gpu",
+    ]
+    if url:
+        cmd.append(url)
+    mpv_process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return "started"
+
+
+def stop_mpv():
+    global mpv_process
+    if mpv_process and mpv_process.poll() is None:
+        mpv_process.terminate()
+        mpv_process = None
+        return "stopped"
+    return "not running"
+
+
+def launch_yt_app(mode="account"):
+    global yt_app_process
+    if yt_app_process and yt_app_process.poll() is None:
+        return "already running"
+    
+    profile_dir = "/home/user/.config/bazzzzite/youtube-tv-guest" if mode == "guest" else "/home/user/.config/bazzzzite/youtube-tv"
+    extra_args = ["--incognito"] if mode == "guest" else []
+    
+    cmd = [
+        "/usr/bin/cage", "--br", "-s", "--",
+        "/usr/bin/chromium",
+            "--user-data-dir=" + profile_dir,
+            "--kiosk", "--noerrdialogs", "--disable-infobars",
+            "--disable-features=Translate",
+            "--ozone-platform=wayland",
+            "--enable-features=VaapiVideoDecoder",
+            "--ignore-gpu-blocklist",
+            "--enable-zero-copy",
+            "--disable-pinch", "--disable-zoom",
+            "--disable-session-crashed-bubble",
+    ] + extra_args + [
+            "https://www.youtube.com/tv"
+    ]
+    
+    yt_app_process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    # Start CEC navigation daemon for YouTube TV
+    subprocess.Popen(["/usr/libexec/bazzzzite-yt-cec"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    return "started"
+
+
+def stop_yt_app():
+    global yt_app_process
+    if yt_app_process and yt_app_process.poll() is None:
+        yt_app_process.terminate()
+        yt_app_process = None
+        return "stopped"
+    return "not running"
+
+
+async def websocket_handler(request):
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+    ws_clients.add(ws)
+    authenticated = False
+    print("WebSocket client connected")
+
+    try:
+        async for msg in ws:
+            if msg.type == WSMsgType.TEXT:
+                try:
+                    data = json.loads(msg.data)
+                    if not authenticated:
+                        if data.get("action") == "auth" and data.get("payload", {}).get("token") == AUTH_TOKEN:
+                            authenticated = True
+                            await ws.send_json({"action": "auth_ok"})
+                            continue
+                        else:
+                            await ws.send_json({"action": "error", "payload": {"message": "unauthorized"}})
+                            await ws.close()
+                            break
+                    await handle_ws_message(ws, data)
+                except json.JSONDecodeError:
+                    pass
+            elif msg.type == WSMsgType.ERROR:
+                break
+    finally:
+        ws_clients.discard(ws)
+        print("WebSocket client disconnected")
+    return ws
+
+
+async def handle_ws_message(ws, data):
+    action = data.get("action")
+    payload = data.get("payload", {})
+
+    if action == "mpv_play":
+        url = payload.get("url", "")
+        result = start_mpv(url)
+        await ws.send_json({"action": "mpv_status", "payload": {"status": result}})
+
+    elif action == "mpv_stop":
+        result = stop_mpv()
+        await ws.send_json({"action": "mpv_status", "payload": {"status": result}})
+
+    elif action == "mpv_pause":
+        subprocess.run(["socat", "-", "/tmp/mpv.sock"], input=b'{"command": ["cycle", "pause"]}', timeout=2)
+        await ws.send_json({"action": "mpv_paused"})
+
+    elif action == "mpv_seek":
+        seconds = payload.get("seconds", 0)
+        cmd = b'{"command": ["seek", ' + str(seconds).encode() + b', "relative"]}'
+        subprocess.run(["socat", "-", "/tmp/mpv.sock"], input=cmd, timeout=2)
+        await ws.send_json({"action": "mpv_seeked"})
+
+    elif action == "system_reboot":
+        subprocess.Popen(["systemctl", "reboot"])
+        await ws.send_json({"action": "system_rebooting"})
+
+    elif action == "system_shutdown":
+        subprocess.Popen(["systemctl", "poweroff"])
+        await ws.send_json({"action": "system_shutting_down"})
+
+    elif action == "os_check_update":
+        try:
+            res = subprocess.run(["bootc", "upgrade", "--check"], capture_output=True, text=True, timeout=30)
+            output = res.stdout + res.stderr
+            has_update = "update available" in output.lower() or "new" in output.lower()
+            await ws.send_json({"action": "os_update_status", "payload": {"available": has_update, "output": output}})
+        except Exception as e:
+            await ws.send_json({"action": "os_update_status", "payload": {"available": False, "error": str(e)}})
+
+    elif action == "os_apply_update":
+        subprocess.Popen(["bootc", "upgrade"])
+        await ws.send_json({"action": "os_updating", "payload": {"message": "Update staged. The system will reboot to apply."}})
+
+    elif action == "os_rollback":
+        subprocess.Popen(["bootc", "rollback"])
+        await ws.send_json({"action": "os_rolling_back", "payload": {"message": "Rollback staged. The system will reboot to apply."}})
+
+    elif action == "os_status":
+        try:
+            res = subprocess.run(["bootc", "status"], capture_output=True, text=True, timeout=10)
+            await ws.send_json({"action": "os_status", "payload": {"output": res.stdout + res.stderr}})
+        except Exception as e:
+            await ws.send_json({"action": "os_status", "payload": {"error": str(e)}})
+
+    elif action == "game_mode_start":
+        subprocess.Popen(["/usr/libexec/bazzzzite-game-mode", "start"])
+        await ws.send_json({"action": "game_mode", "payload": {"enabled": True}})
+
+    elif action == "game_mode_stop":
+        subprocess.Popen(["/usr/libexec/bazzzzite-game-mode", "stop"])
+        await ws.send_json({"action": "game_mode", "payload": {"enabled": False}})
+
+    elif action == "game_mode_status":
+        try:
+            res = subprocess.run(["/usr/libexec/bazzzzite-game-mode", "status"], capture_output=True, text=True, timeout=5)
+            await ws.send_json({"action": "game_mode", "payload": {"output": res.stdout}})
+        except Exception as e:
+            await ws.send_json({"action": "game_mode", "payload": {"error": str(e)}})
+
+    elif action == "yt_search":
+        query = payload.get("query", "")
+        if not query:
+            await ws.send_json({"action": "yt_results", "payload": {"videos": []}})
+            return
+        try:
+            res = subprocess.run(
+                ["/usr/libexec/bazzzzite-yt", "search", query],
+                capture_output=True, text=True, timeout=15
+            )
+            videos = json.loads(res.stdout) if res.stdout else []
+            await ws.send_json({"action": "yt_results", "payload": {"videos": videos}})
+        except Exception as e:
+            await ws.send_json({"action": "yt_results", "payload": {"videos": [], "error": str(e)}})
+
+    elif action == "yt_play":
+        url = payload.get("url", "")
+        if not url:
+            return
+        try:
+            res = subprocess.run(
+                ["/usr/libexec/bazzzzite-yt", "play", url],
+                capture_output=True, text=True, timeout=15
+            )
+            stream_url = res.stdout.strip()
+            if stream_url:
+                start_mpv(stream_url)
+                await ws.send_json({"action": "mpv_status", "payload": {"status": "started"}})
+        except Exception as e:
+            await ws.send_json({"action": "error", "payload": {"message": str(e)}})
+
+    elif action == "file_list":
+        path = payload.get("path", "/mnt/media")
+        try:
+            res = subprocess.run(
+                ["/usr/libexec/bazzzzite-fm", "list", path],
+                capture_output=True, text=True, timeout=5
+            )
+            items = json.loads(res.stdout) if res.stdout else []
+            await ws.send_json({"action": "file_list", "payload": {"items": items, "path": path}})
+        except Exception as e:
+            await ws.send_json({"action": "file_list", "payload": {"items": [], "error": str(e)}})
+
+    elif action == "voice_start":
+        subprocess.Popen(["systemctl", "start", "bazzzzite-voice.service"])
+        await ws.send_json({"action": "voice_status", "payload": {"running": True}})
+
+    elif action == "voice_stop":
+        subprocess.Popen(["systemctl", "stop", "bazzzzite-voice.service"])
+        await ws.send_json({"action": "voice_status", "payload": {"running": False}})
+
+    elif action == "voice_status":
+        try:
+            res = subprocess.run(["systemctl", "is-active", "bazzzzite-voice.service"], capture_output=True, text=True)
+            running = res.stdout.strip() == "active"
+            await ws.send_json({"action": "voice_status", "payload": {"running": running}})
+        except Exception:
+            await ws.send_json({"action": "voice_status", "payload": {"running": False}})
+
+    elif action == "rygel_start":
+        subprocess.Popen(["systemctl", "start", "bazzzzite-rygel.service"])
+        await ws.send_json({"action": "rygel_status", "payload": {"running": True}})
+
+    elif action == "rygel_stop":
+        subprocess.Popen(["systemctl", "stop", "bazzzzite-rygel.service"])
+        await ws.send_json({"action": "rygel_status", "payload": {"running": False}})
+
+    elif action == "rygel_status":
+        try:
+            res = subprocess.run(["systemctl", "is-active", "bazzzzite-rygel.service"], capture_output=True, text=True)
+            running = res.stdout.strip() == "active"
+            await ws.send_json({"action": "rygel_status", "payload": {"running": running}})
+        except Exception:
+            await ws.send_json({"action": "rygel_status", "payload": {"running": False}})
+
+    elif action == "get_settings":
+        await ws.send_json({"action": "settings", "payload": settings})
+
+    elif action == "set_setting":
+        key = payload.get("key")
+        value = payload.get("value")
+        if key:
+            settings[key] = value
+            save_settings(settings)
+            await ws.send_json({"action": "settings", "payload": settings})
+
+    elif action == "get_profiles":
+        await ws.send_json({"action": "profiles", "payload": profiles})
+
+    elif action == "set_profile":
+        profile_id = payload.get("profile")
+        pin = payload.get("pin", "")
+        if profile_id in profiles:
+            profile = profiles[profile_id]
+            if profile.get("pin") and profile["pin"] != pin:
+                await ws.send_json({"action": "error", "payload": {"message": "wrong pin"}})
+                return
+            settings["profile"] = profile_id
+            save_settings(settings)
+            global current_profile
+            current_profile = profile_id
+            await ws.send_json({"action": "profile_changed", "payload": {"profile": profile_id}})
+
+    elif action == "launch_app":
+        app = payload.get("app", "")
+        allowed_apps = {
+            "retroarch", "kodi", "jellyfin", "cec-test", "gpu-stats", "edid",
+            "filemanager", "youtube", "netflix", "twitch", "spotify",
+            "youtube-tv", "youtube-tv-guest"
+        }
+        if app not in allowed_apps:
+            await ws.send_json({"action": "error", "payload": {"message": "app not allowed"}})
+            return
+        if app in ("youtube-tv", "youtube-tv-guest"):
+            result = launch_yt_app(app)
+            await ws.send_json({"action": "app_launched", "payload": {"app": app, "status": result}})
+            return
+        if app == "retroarch":
+            if settings.get("game_mode"):
+                subprocess.Popen(["/usr/libexec/bazzzzite-game-mode", "start"])
+                await asyncio.sleep(2)
+            subprocess.Popen(["retroarch"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif app == "kodi":
+            subprocess.Popen(["kodi", "--fullscreen"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif app == "jellyfin":
+            subprocess.Popen(["xdg-open", "http://localhost:8096"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif app == "cec-test":
+            subprocess.Popen(["xterm", "-e", "cec-client -d 1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif app == "gpu-stats":
+            subprocess.Popen(["xterm", "-e", "intel_gpu_top"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif app == "edid":
+            subprocess.Popen(["xterm", "-e", "/usr/libexec/bazzzzite-edid"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        await ws.send_json({"action": "app_launched", "payload": {"app": app}})
+
+    elif action == "get_status":
+        await ws.send_json({
+            "action": "status",
+            "payload": {
+                "mpv_running": mpv_process is not None and mpv_process.poll() is None,
+                "jellyfin_url": "http://localhost:8096",
+                "settings": settings,
+                "profile": current_profile,
+            }
+        })
+
+    elif action == "cam_list":
+        try:
+            res = subprocess.run(["/usr/libexec/bazzzzite-cam", "list"], capture_output=True, text=True, timeout=5)
+            await ws.send_json({"action": "cam_list", "payload": {"output": res.stdout}})
+        except Exception as e:
+            await ws.send_json({"action": "cam_list", "payload": {"error": str(e)}})
+
+    elif action == "cam_pip":
+        name = payload.get("name", "")
+        if not name:
+            await ws.send_json({"action": "error", "payload": {"message": "camera name required"}})
+            return
+        try:
+            res = subprocess.run(["/usr/libexec/bazzzzite-cam", "pip", name], capture_output=True, text=True, timeout=10)
+            await ws.send_json({"action": "cam_pip", "payload": {"name": name, "output": res.stdout + res.stderr}})
+        except Exception as e:
+            await ws.send_json({"action": "cam_pip", "payload": {"error": str(e)}})
+
+    elif action == "cam_stop":
+        name = payload.get("name", "")
+        try:
+            args = ["/usr/libexec/bazzzzite-cam", "stop"]
+            if name:
+                args.append(name)
+            subprocess.run(args, capture_output=True, text=True, timeout=5)
+            await ws.send_json({"action": "cam_stop", "payload": {"name": name or "all"}})
+        except Exception as e:
+            await ws.send_json({"action": "cam_stop", "payload": {"error": str(e)}})
+
+    elif action == "cam_watch":
+        name = payload.get("name", "")
+        if not name:
+            await ws.send_json({"action": "error", "payload": {"message": "camera name required"}})
+            return
+        try:
+            subprocess.Popen(["/usr/libexec/bazzzzite-cam", "watch", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            await ws.send_json({"action": "cam_watch", "payload": {"name": name, "status": "started"}})
+        except Exception as e:
+            await ws.send_json({"action": "cam_watch", "payload": {"error": str(e)}})
+
+    elif action == "cam_unwatch":
+        name = payload.get("name", "")
+        try:
+            subprocess.run(["/usr/libexec/bazzzzite-cam", "unwatch", name], capture_output=True, text=True, timeout=5)
+            await ws.send_json({"action": "cam_unwatch", "payload": {"name": name}})
+        except Exception as e:
+            await ws.send_json({"action": "cam_unwatch", "payload": {"error": str(e)}})
+
+    elif action == "cam_scan":
+        try:
+            subprocess.Popen(["/usr/libexec/bazzzzite-cam", "scan"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            await ws.send_json({"action": "cam_scan", "payload": {"status": "started"}})
+        except Exception as e:
+            await ws.send_json({"action": "cam_scan", "payload": {"error": str(e)}})
+
+    elif action == "cam_add":
+        name = payload.get("name", "").strip()
+        url = payload.get("url", "").strip()
+        threshold = payload.get("threshold", "")
+        if not name or not url:
+            await ws.send_json({"action": "error", "payload": {"message": "name and url required"}})
+            return
+        try:
+            with open("/etc/bazzzzite/cameras.conf", "a") as f:
+                line = f"{name} {url}"
+                if threshold:
+                    line += f" {threshold}"
+                f.write(f"\n{line}\n")
+            await ws.send_json({"action": "cam_add", "payload": {"name": name, "url": url}})
+        except Exception as e:
+            await ws.send_json({"action": "cam_add", "payload": {"error": str(e)}})
+
+    elif action == "cam_remove":
+        name = payload.get("name", "").strip()
+        if not name:
+            await ws.send_json({"action": "error", "payload": {"message": "name required"}})
+            return
+        try:
+            lines = []
+            with open("/etc/bazzzzite/cameras.conf", "r") as f:
+                for line in f:
+                    if not line.startswith(f"{name} ") and line.strip() != name:
+                        lines.append(line)
+            with open("/etc/bazzzzite/cameras.conf", "w") as f:
+                f.writelines(lines)
+            await ws.send_json({"action": "cam_remove", "payload": {"name": name}})
+        except Exception as e:
+            await ws.send_json({"action": "cam_remove", "payload": {"error": str(e)}})
+
+    elif action == "cam_get_settings":
+        cam_settings = {
+            "hwaccel": os.environ.get("CAM_HWACCEL", "software"),
+            "fps": os.environ.get("CAM_FPS", "2"),
+            "width": os.environ.get("CAM_WIDTH", "320"),
+            "threshold": os.environ.get("CAM_THRESHOLD", "10"),
+            "popup_seconds": os.environ.get("CAM_POPUP_SECONDS", "15"),
+            "cooldown": os.environ.get("CAM_COOLDOWN", "30"),
+            "pip_pos": os.environ.get("CAM_PIP_POS", "-10-10"),
+            "pip_size": os.environ.get("CAM_PIP_SIZE", "320x180"),
+        }
+        await ws.send_json({"action": "cam_settings", "payload": cam_settings})
+
+    elif action == "cam_set_setting":
+        key = payload.get("key", "")
+        value = payload.get("value", "")
+        if key:
+            os.environ[f"CAM_{key.upper()}"] = str(value)
+            await ws.send_json({"action": "cam_settings", "payload": {key: value}})
+        else:
+            await ws.send_json({"action": "error", "payload": {"message": "key required"}})
+
+    else:
+        await ws.send_json({"action": "error", "payload": {"message": "unknown action"}})
+
+
+async def http_handler(request):
+    path = request.path
+    if path == "/" or path == "/index.html":
+        path = "/index.html"
+    if path == "/token":
+        return web.json_response({"token": AUTH_TOKEN or ""})
+    file_path = SHELL_DIR / path.lstrip("/")
+    if not file_path.exists() or not file_path.is_file():
+        return web.Response(status=404, text="Not found")
+    content_types = {
+        ".html": "text/html", ".css": "text/css", ".js": "application/javascript",
+        ".json": "application/json", ".png": "image/png", ".jpg": "image/jpeg",
+        ".svg": "image/svg+xml",
+    }
+    ext = file_path.suffix
+    return web.FileResponse(file_path, headers={"Content-Type": content_types.get(ext, "application/octet-stream")})
+
+
+async def websocket_endpoint(request):
+    return await websocket_handler(request)
+
+
+def create_app():
+    app = web.Application()
+    app.router.add_get("/", http_handler)
+    app.router.add_get("/{path:.*}", http_handler)
+    app.router.add_get("/ws", websocket_endpoint)
+    return app
+
+
+def main():
+    print(f"Starting TV bridge on http://localhost:{PORT}")
+    web.run_app(create_app(), host="localhost", port=PORT, print=None)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        stop_mpv()
+        sys.exit(0)

@@ -1,0 +1,9 @@
+[Unit]
+Description=Bazzzzite Game Mode (performance governor + disable Cage)
+After=bazzzzite-tv-shell.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/bazzzzite-game-mode start
+RemainAfterExit=yes
+ExecStop=/usr/libexec/bazzzzite-game-mode stop

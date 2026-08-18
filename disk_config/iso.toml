@@ -1,0 +1,10 @@
+[[customizations.filesystem]]
+mountpoint = "/"
+minsize = "30 GiB"
+
+[[customizations.filesystem]]
+mountpoint = "/mnt/media"
+minsize = "100 GiB"
+
+[customizations.kernel]
+append = "video=HDMI-A-1:1920x1080@60"

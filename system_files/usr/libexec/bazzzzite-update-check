@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# bazzzzite-update-check: check for OS updates and notify
+set -euo pipefail
+
+if ! command -v bootc >/dev/null 2>&1; then
+    echo "bootc not available, skipping OS update check" | systemd-cat -t bazzzzite-update-check
+    exit 0
+fi
+
+OUTPUT=$(bootc upgrade --check 2>&1 || true)
+if echo "$OUTPUT" | grep -qi "update available\|new"; then
+    echo "System update available. Open Settings > System > Check for Updates." | wall
+fi
+
+echo "$OUTPUT" | systemd-cat -t bazzzzite-update-check

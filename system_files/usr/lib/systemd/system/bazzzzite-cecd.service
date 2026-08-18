@@ -1,0 +1,12 @@
+[Unit]
+Description=Bazzzzite CEC Remote Daemon
+After=network.target bazzzzite-tv-bridge.service
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/bazzzzite-cecd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=bazzzzite-tv-shell.service

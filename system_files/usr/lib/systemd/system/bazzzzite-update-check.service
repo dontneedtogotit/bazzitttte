@@ -1,0 +1,8 @@
+[Unit]
+Description=Bazzzzite TV Update Checker
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/bazzzzite-update-check
+StandardOutput=null

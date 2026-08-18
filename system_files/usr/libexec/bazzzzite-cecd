@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""
+bazzzzite-cecd: HDMI-CEC daemon for TV remote control.
+Reads CEC events from cec-client and forwards them to the TV bridge WebSocket.
+"""
+
+import json
+import os
+import subprocess
+import sys
+import websockets
+import asyncio
+
+WS_URL = "ws://localhost:8080/ws"
+CEC_DEVICE = os.environ.get("CEC_DEVICE", "/dev/cec0")
+
+CEC_KEYMAP = {
+    "play": "play",
+    "pause": "pause",
+    "stop": "stop",
+    "fast-forward": "fast_forward",
+    "rewind": "rewind",
+    "next": "next",
+    "previous": "previous",
+    "select": "enter",
+    "up": "up",
+    "down": "down",
+    "left": "left",
+    "right": "right",
+    "exit": "back",
+    "return": "back",
+    "home": "home",
+    "channel_up": "channel_up",
+    "channel_down": "channel_down",
+    "volume_up": "volume_up",
+    "volume_down": "volume_down",
+    "mute": "mute",
+}
+
+
+async def send_event(websocket, key, action="keydown"):
+    try:
+        await websocket.send(json.dumps({
+            "action": "cec_event",
+            "payload": {"key": key, "action": action}
+        }))
+    except Exception:
+        pass
+
+
+def parse_cec_line(line):
+    line = line.strip()
+    if "key pressed" in line:
+        for ceckey, jsKey in CEC_KEYMAP.items():
+            if ceckey in line.lower():
+                return jsKey, "keydown"
+    elif "key released" in line:
+        for ceckey, jsKey in CEC_KEYMAP.items():
+            if ceckey in line.lower():
+                return jsKey, "keyup"
+    return None, None
+
+
+async def cec_reader():
+    proc = subprocess.Popen(
+        ["cec-client", "-d", "1", "-t", "p"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        bufsize=1
+    )
+    print("CEC reader started")
+
+    async def connect_ws():
+        while True:
+            try:
+                return await websockets.connect(WS_URL, ping_interval=20, ping_timeout=20)
+            except Exception:
+                await asyncio.sleep(1)
+
+    ws = await connect_ws()
+
+    while True:
+        try:
+            line = await asyncio.get_running_loop().run_in_executor(None, proc.stdout.readline)
+        except Exception:
+            break
+        if not line:
+            break
+        key, action = parse_cec_line(line)
+        if key:
+            try:
+                await send_event(ws, key, action)
+            except Exception:
+                ws = await connect_ws()
+
+    proc.terminate()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(cec_reader())
+    except KeyboardInterrupt:
+        sys.exit(0)

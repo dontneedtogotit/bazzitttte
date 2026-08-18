@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# bazzzzite-yt-cec: CEC remote navigation daemon for YouTube TV
+# Maps CEC remote buttons to keyboard events for YouTube TV interface
+set -euo pipefail
+
+CEC_DEVICE="${CEC_DEVICE:-/dev/cec0}"
+
+# YouTube TV keyboard shortcuts via CEC
+declare -A CEC_MAP=(
+    ["select"]="Return"
+    ["up"]="Up"
+    ["down"]="Down"
+    ["left"]="Left"
+    ["right"]="Right"
+    ["exit"]="Escape"
+    ["return"]="BackSpace"
+    ["play"]="space"
+    ["pause"]="space"
+    ["stop"]="Escape"
+    ["fast-forward"]="F"
+    ["rewind"]="F"
+    ["volume_up"]="Up"
+    ["volume_down"]="Down"
+    ["mute"]="m"
+    ["channel_up"]="Page_Down"
+    ["channel_down"]="Page_Up"
+)
+
+# Find the YouTube TV window
+find_yt_window() {
+    # Look for Cage or Chromium window with youtube.com/tv
+    wmctrl -l 2>/dev/null | grep -i "youtube\|chromium\|cage" | head -1 | awk '{print $1}'
+}
+
+# Send keystroke to YouTube TV window
+send_key() {
+    local key="$1"
+    local window="$2"
+    if [[ -n "$window" ]]; then
+        xdotool key --window "$window" "$key" 2>/dev/null || xdotool key "$key" 2>/dev/null || true
+    else
+        xdotool key "$key" 2>/dev/null || true
+    fi
+}
+
+# Main loop: read CEC events and forward to YouTube TV
+cec-client -d 1 -t p 2>/dev/null | while IFS= read -r line; do
+    line=$(echo "$line" | tr '[:upper:]' '[:lower:]')
+    
+    # Check for key pressed events
+    if [[ "$line" == *"key pressed"* ]]; then
+        for cec_key in "${!CEC_MAP[@]}"; do
+            if [[ "$line" == *"$cec_key"* ]]; then
+                window=$(find_yt_window)
+                send_key "${CEC_MAP[$cec_key]}" "$window"
+                echo "[yt-cec] ${cec_key} -> ${CEC_MAP[$cec_key]}"
+                break
+            fi
+        done
+    fi
+done

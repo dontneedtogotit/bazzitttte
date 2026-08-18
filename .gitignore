@@ -1,0 +1,11 @@
+# Bazzzzite TV
+*.qcow2
+*.raw
+*.iso
+previous.manifest.json
+changelog.md
+output.env
+_build
+ctx
+output/
+cosign.key

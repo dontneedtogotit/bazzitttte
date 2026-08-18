@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# bazzzzite-edid: detect TV EDID and force optimal HDMI mode
+# Reads EDID from the active HDMI output and sets the kernel video parameter
+set -euo pipefail
+
+EDID_PATH="/sys/class/drm/card0-HDMI-A-1/edid"
+KERNEL_CMD="/proc/cmdline"
+CONF_FILE="/etc/bazzzzite/edid-mode"
+
+if [[ ! -r "$EDID_PATH" ]]; then
+    echo "No EDID found at $EDID_PATH. Is the TV connected via HDMI?"
+    exit 1
+fi
+
+MODES=$(cat "$EDID_PATH" | edid-decode 2>/dev/null | grep -oP '\d{3,4}x\d{3,4}@\d+' | sort -u || true)
+
+if [[ -z "$MODES" ]]; then
+    echo "Could not decode EDID modes. Install edid-decode or use manual mode."
+    exit 1
+fi
+
+echo "Detected HDMI modes:"
+echo "$MODES"
+
+PREFERRED=$(echo "$MODES" | grep -E '1920x1080@60|1280x720@60' | head -1 || true)
+if [[ -z "$PREFERRED" ]]; then
+    PREFERRED=$(echo "$MODES" | head -1)
+fi
+
+echo "Preferred mode: $PREFERRED"
+
+RES=$(echo "$PREFERRED" | cut -d@ -f1)
+REFRESH=$(echo "$PREFERRED" | cut -d@ -f2)
+
+echo "video=HDMI-A-1:${RES}@${REFRESH}" | sudo tee "$CONF_FILE" > /dev/null
+echo "Mode saved to $CONF_FILE. Reboot to apply."

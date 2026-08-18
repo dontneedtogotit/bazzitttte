@@ -1,0 +1,17 @@
+[Unit]
+Description=Bazzzzite TV Shell (Cage + Chromium)
+After=systemd-user-sessions.service bazzzzite-tv-bridge.service bazzzzite-cecd.service network.target
+Wants=bazzzzite-tv-bridge.service bazzzzite-cecd.service
+Conflicts=display-manager.service
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/libexec/bazzzzite-start-tv
+Restart=on-failure
+RestartSec=5
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=WAYLAND_DISPLAY=wayland-0
+
+[Install]
+WantedBy=graphical.target

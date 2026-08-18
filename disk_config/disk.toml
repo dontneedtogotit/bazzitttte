@@ -1,0 +1,7 @@
+[[customizations.filesystem]]
+mountpoint = "/"
+minsize = "30 GiB"
+
+[[customizations.filesystem]]
+mountpoint = "/mnt/media"
+minsize = "100 GiB"

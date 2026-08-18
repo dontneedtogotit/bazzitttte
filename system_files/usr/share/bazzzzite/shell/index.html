@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bazzzzite TV</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header id="topbar">
+            <div class="left">
+                <span class="logo">BAZzzzzITE</span>
+                <nav class="nav-items">
+                    <button class="nav-btn active" data-tab="home">Home</button>
+                    <button class="nav-btn" data-tab="media">Media</button>
+                    <button class="nav-btn" data-tab="live">Live TV</button>
+                    <button class="nav-btn" data-tab="emulation">Games</button>
+                    <button class="nav-btn" data-tab="cameras">Cameras</button>
+                    <button class="nav-btn" data-tab="youtube">YouTube</button>
+                    <button class="nav-btn" data-tab="apps">Apps</button>
+                </nav>
+            </div>
+            <div class="right">
+                <span id="clock"></span>
+                <span id="update-badge" class="hidden">&#11088;</span>
+                <button class="icon-btn" id="settings-btn" aria-label="Settings">&#9881;</button>
+            </div>
+        </header>
+
+        <main id="content">
+            <section id="hero" class="tab-panel active">
+                <div class="hero-background" id="hero-bg"></div>
+                <div class="hero-content">
+                    <h1 id="hero-title">Welcome</h1>
+                    <p id="hero-desc">Your personal TV experience</p>
+                    <button class="hero-btn" id="hero-play">&#9654; Play</button>
+                </div>
+            </section>
+
+            <section id="media-panel" class="tab-panel">
+                <div class="row">
+                    <h2>Recently Added</h2>
+                    <div class="row-items" id="recently-added"></div>
+                </div>
+                <div class="row">
+                    <h2>Continue Watching</h2>
+                    <div class="row-items" id="continue-watching"></div>
+                </div>
+                <div class="row">
+                    <h2>Movies</h2>
+                    <div class="row-items" id="movies-row"></div>
+                </div>
+                <div class="row">
+                    <h2>TV Shows</h2>
+                    <div class="row-items" id="shows-row"></div>
+                </div>
+            </section>
+
+            <section id="live-panel" class="tab-panel">
+                <div class="row">
+                    <h2>Live Channels</h2>
+                    <div class="row-items" id="channels-row"></div>
+                </div>
+            </section>
+
+            <section id="emulation-panel" class="tab-panel">
+                <div class="row">
+                    <h2>Systems</h2>
+                    <div class="row-items" id="systems-row"></div>
+                </div>
+            </section>
+
+            <section id="cameras-panel" class="tab-panel">
+                <div class="camera-layout">
+                    <div class="camera-main">
+                        <div class="camera-section">
+                            <h2>Add Camera</h2>
+                            <div class="camera-form">
+                                <input type="text" id="cam-name" placeholder="Camera name (e.g. frontdoor)" autocomplete="off">
+                                <input type="text" id="cam-url" placeholder="RTSP URL (e.g. rtsp://192.168.1.50:554/stream1)" autocomplete="off">
+                                <input type="text" id="cam-threshold" placeholder="Motion threshold (optional, default 10)" autocomplete="off">
+                                <button class="search-btn" id="cam-add-btn">Add Camera</button>
+                            </div>
+                        </div>
+
+                        <div class="camera-section">
+                            <h2>Configured Cameras</h2>
+                            <div id="cameras-row"></div>
+                        </div>
+                    </div>
+
+                    <div class="camera-sidebar">
+                        <div class="camera-section">
+                            <h2>Quick Actions</h2>
+                            <div class="camera-controls">
+                                <button class="setting-item" id="cam-scan-btn">🔍 Scan Network</button>
+                                <button class="setting-item" id="cam-stop-all-btn">⏹️ Stop All PiP</button>
+                            </div>
+                            <div id="cam-status" class="loading"></div>
+                        </div>
+
+                        <div class="camera-section">
+                            <h2>PiP Settings</h2>
+                            <div class="settings-list">
+                                <label class="setting-label">Position
+                                    <select id="cam-pip-pos">
+                                        <option value="-10-10">Bottom Right</option>
+                                        <option value="-10+10">Bottom Left</option>
+                                        <option value="10-10">Top Right</option>
+                                        <option value="10+10">Top Left</option>
+                                    </select>
+                                </label>
+                                <label class="setting-label">Size
+                                    <select id="cam-pip-size">
+                                        <option value="320x180">Small (320x180)</option>
+                                        <option value="480x270">Medium (480x270)</option>
+                                        <option value="640x360">Large (640x360)</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="camera-section">
+                            <h2>Motion Detection</h2>
+                            <div class="settings-list">
+                                <label class="setting-label">Sensitivity (lower = more sensitive)
+                                    <input type="number" id="cam-threshold-input" value="10" min="1" max="100">
+                                </label>
+                                <label class="setting-label">Popup Duration (seconds)
+                                    <input type="number" id="cam-popup" value="15" min="5" max="120">
+                                </label>
+                                <label class="setting-label">Cooldown (seconds)
+                                    <input type="number" id="cam-cooldown" value="30" min="5" max="300">
+                                </label>
+                                <label class="setting-label">Analysis FPS
+                                    <input type="number" id="cam-fps" value="2" min="1" max="10">
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="camera-section">
+                            <h2>Performance</h2>
+                            <div class="settings-list">
+                                <label class="setting-label">Hardware Decode
+                                    <select id="cam-hwaccel">
+                                        <option value="software">Software (compatible)</option>
+                                        <option value="vaapi">VA-API (GPU, lower CPU)</option>
+                                    </select>
+                                </label>
+                                <label class="setting-label">Analysis Width
+                                    <input type="number" id="cam-width" value="320" min="160" max="640" step="160">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="youtube-panel" class="tab-panel">
+                <div class="search-bar">
+                    <input type="text" id="yt-search-input" placeholder="Search YouTube..." autocomplete="off">
+                    <button class="search-btn" id="yt-search-btn">Search</button>
+                </div>
+                <div class="row">
+                    <h2>Results</h2>
+                    <div class="row-items" id="yt-results"></div>
+                </div>
+            </section>
+
+            <section id="apps-panel" class="tab-panel">
+                <div class="row">
+                    <h2>Applications</h2>
+                    <div class="row-items" id="apps-row"></div>
+                </div>
+            </section>
+        </main>
+
+        <div id="settings-overlay" class="overlay hidden">
+            <div class="overlay-content">
+                <h2>Settings</h2>
+                <div class="settings-section">
+                    <h3>Display</h3>
+                    <div class="settings-list">
+                        <button class="setting-item" data-action="tv-scale-up">UI Scale: Larger</button>
+                        <button class="setting-item" data-action="tv-scale-down">UI Scale: Smaller</button>
+                        <button class="setting-item" data-action="edid-detect">Detect HDMI Mode</button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>Remote</h3>
+                    <div class="settings-list">
+                        <button class="setting-item" data-action="cec-test">Test CEC Remote</button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>Features</h3>
+                    <div class="settings-list">
+                        <button class="setting-item" data-action="voice-toggle">Voice: <span id="voice-status">Off</span></button>
+                        <button class="setting-item" data-action="game-mode-toggle">Game Mode: <span id="game-mode-status">Off</span></button>
+                        <button class="setting-item" data-action="dlna-toggle">DLNA Renderer: <span id="dlna-status">Off</span></button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>System</h3>
+                    <div class="settings-list">
+                        <button class="setting-item" data-action="gpu-stats">GPU Stats</button>
+                        <button class="setting-item" data-action="os-update">Check for Updates</button>
+                        <button class="setting-item" data-action="os-rollback">Rollback Update</button>
+                        <button class="setting-item" data-action="system-reboot">Reboot</button>
+                        <button class="setting-item" data-action="system-shutdown">Shutdown</button>
+                    </div>
+                </div>
+                <button class="close-btn" id="close-settings">Close</button>
+            </div>
+        </div>
+
+        <div id="update-overlay" class="overlay hidden">
+            <div class="overlay-content">
+                <h2>System Update</h2>
+                <div id="update-status">Checking...</div>
+                <div class="update-actions hidden" id="update-actions">
+                    <button class="setting-item" id="update-apply">Download & Install</button>
+                    <button class="setting-item" id="update-cancel">Later</button>
+                </div>
+                <button class="close-btn" id="close-update">Close</button>
+            </div>
+        </div>
+
+        <div id="profile-overlay" class="overlay hidden">
+            <div class="overlay-content">
+                <h2>Select Profile</h2>
+                <div class="settings-list" id="profile-list"></div>
+                <div class="pin-input hidden" id="pin-input">
+                    <input type="password" id="pin-field" placeholder="Enter PIN" maxlength="4">
+                    <button class="setting-item" id="pin-submit">OK</button>
+                </div>
+                <button class="close-btn" id="close-profile">Cancel</button>
+            </div>
+        </div>
+
+        <div id="video-overlay" class="overlay hidden">
+            <div class="video-controls" id="video-controls">
+                <button class="vc-btn" id="vc-pause">&#10074;&#10074;</button>
+                <button class="vc-btn" id="vc-stop">&#9632;</button>
+                <span id="vc-time">00:00</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/mpv.js"></script>
+    <script src="js/jellyfin.js"></script>
+    <script src="js/iptv.js"></script>
+    <script src="js/emulation.js"></script>
+    <script src="js/cameras.js"></script>
+    <script src="js/youtube.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/profiles.js"></script>
+    <script src="js/updates.js"></script>
+</body>
+</html>

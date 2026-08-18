@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# bazzzzite-yt: YouTube search and playback helper
+# Usage: bazzzzite-yt search <query> | bazzzzite-yt play <url>
+set -euo pipefail
+
+ACTION="${1:-search}"
+QUERY="${2:-}"
+ERR_FILE=$(mktemp)
+trap 'rm -f "$ERR_FILE"' EXIT
+
+case "$ACTION" in
+    search)
+        if [[ -z "$QUERY" ]]; then
+            echo '{"error": "no query"}'
+            exit 1
+        fi
+        yt-dlp "ytsearch10:${QUERY}" --dump-json --flat-playlist 2>"$ERR_FILE" | \
+        python3 -c "
+import sys, json
+videos = []
+for line in sys.stdin:
+    try:
+        data = json.loads(line)
+        videos.append({
+            'id': data.get('id', ''),
+            'title': data.get('title', 'Unknown'),
+            'thumbnail': data.get('thumbnails', [{}])[0].get('url', ''),
+            'url': f\"https://youtube.com/watch?v={data.get('id', '')}\",
+            'duration': data.get('duration', 0)
+        })
+    except Exception:
+        pass
+if not videos:
+    with open('${ERR_FILE}') as f:
+        print(json.dumps({'error': 'yt-dlp failed', 'details': f.read()}))
+else:
+    print(json.dumps(videos))
+"
+        ;;
+    play)
+        URL="${QUERY}"
+        if [[ -z "$URL" ]]; then
+            echo '{"error": "no url"}'
+            exit 1
+        fi
+        yt-dlp -g -f "bestvideo[height<=1080]+bestaudio/best[height<=1080]" "$URL" 2>"$ERR_FILE" | head -1
+        ;;
+esac

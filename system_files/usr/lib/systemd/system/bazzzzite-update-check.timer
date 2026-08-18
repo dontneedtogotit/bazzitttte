@@ -1,0 +1,10 @@
+[Unit]
+Description=Bazzzzite TV Update Check Timer
+Requires=bazzzzite-update-check.service
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

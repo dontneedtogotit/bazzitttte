@@ -1,0 +1,12 @@
+[Unit]
+Description=Bazzzzite Voice Control Daemon (Vosk)
+After=network.target bazzzzite-tv-bridge.service
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/bazzzzite-voice
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=bazzzzite-tv-shell.service

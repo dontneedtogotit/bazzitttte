@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# bazzzzite-yt-app: launch YouTube TV as a fullscreen app
+# Usage: bazzzzite-yt-app [guest|account]
+set -euo pipefail
+
+MODE="${1:-account}"
+YT_PROFILE_DIR="/home/user/.config/bazzzzite/youtube-tv"
+YT_GUEST_DIR="/home/user/.config/bazzzzite/youtube-tv-guest"
+
+mkdir -p "$YT_PROFILE_DIR" "$YT_GUEST_DIR"
+
+case "$MODE" in
+    guest)
+        PROFILE_DIR="$YT_GUEST_DIR"
+        EXTRA_ARGS="--incognito"
+        ;;
+    account|*)
+        PROFILE_DIR="$YT_PROFILE_DIR"
+        EXTRA_ARGS=""
+        ;;
+esac
+
+USER_NAME=$(awk -F: '($3 >= 1000 && $3 < 60000) { print $1; exit }' /etc/passwd)
+USER_UID=$(id -u "$USER_NAME")
+export XDG_RUNTIME_DIR="/run/user/${USER_UID}"
+export DISPLAY=":0"
+export WAYLAND_DISPLAY="wayland-0"
+
+echo "Starting YouTube TV (${MODE} mode)..."
+
+exec runuser -u "$USER_NAME" -- dbus-run-session -- \
+    /usr/bin/cage --br -s -- \
+    /usr/bin/chromium \
+        --user-data-dir="$PROFILE_DIR" \
+        --kiosk --noerrdialogs --disable-infobars \
+        --disable-features=Translate \
+        --ozone-platform=wayland \
+        --enable-features=VaapiVideoDecoder \
+        --ignore-gpu-blocklist \
+        --enable-zero-copy \
+        --disable-pinch \
+        --disable-zoom \
+        --disable-session-crashed-bubble \
+        $EXTRA_ARGS \
+        "https://www.youtube.com/tv"

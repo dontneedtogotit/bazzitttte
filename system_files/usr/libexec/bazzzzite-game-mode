@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# bazzzzite-game-mode: switch to game mode (disable Cage, performance governor)
+# Usage: bazzzzite-game-mode start|stop|status
+set -euo pipefail
+
+CAGE_PID=$(pgrep -f "cage --br" || true)
+GOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo "unknown")
+
+case "${1:-status}" in
+    start)
+        if [[ -n "$CAGE_PID" ]]; then
+            echo "Stopping Cage (PID $CAGE_PID)..."
+            kill "$CAGE_PID" 2>/dev/null || true
+            sleep 1
+        fi
+        echo "Setting CPU governor to performance..."
+        for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+            echo "performance" > "$cpu/cpufreq/scaling_governor" 2>/dev/null || true
+        done
+        echo "Game mode enabled. Launch your game now."
+        ;;
+    stop)
+        echo "Restoring CPU governor to schedutil..."
+        for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+            echo "schedutil" > "$cpu/cpufreq/scaling_governor" 2>/dev/null || true
+        done
+        echo "Restarting Cage..."
+        systemctl restart bazzzzite-tv-shell.service 2>/dev/null || true
+        echo "Game mode disabled. TV shell restored."
+        ;;
+    status)
+        echo "Cage running: $([ -n \"$CAGE_PID\" ] && echo yes || echo no)"
+        echo "CPU governor: $GOVERNOR"
+        ;;
+esac

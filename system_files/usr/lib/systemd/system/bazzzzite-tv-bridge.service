@@ -1,0 +1,12 @@
+[Unit]
+Description=Bazzzzite TV Bridge (WebSocket server for TV shell)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/bazzzzite-tv-bridge
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=bazzzzite-tv-shell.service
