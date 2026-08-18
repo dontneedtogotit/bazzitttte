@@ -32,7 +32,7 @@ if [[ ! -f /usr/share/vosk-models/vosk-model-small-en-us-0.15/model.tar.gz ]]; t
     curl -L -o /tmp/vosk-model.tar.gz \
         "https://github.com/alphacep/vosk-models/releases/download/v0.3.4/vosk-model-small-en-us-0.15.tar.gz" 2>/dev/null || true
     if [[ -f /tmp/vosk-model.tar.gz ]]; then
-        tar -xzf /tmp/vosk-model.tar.gz -C /usr/share/vosk-models/
+        tar -xzf /tmp/vosk-model.tar.gz -C /usr/share/vosk-models/ || true
         rm -f /tmp/vosk-model.tar.gz
     fi
 fi
