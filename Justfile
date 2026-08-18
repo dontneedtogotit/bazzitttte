@@ -73,21 +73,8 @@ publish $target_image=image_name $tag=default_tag: (build target_image tag)
 ostree-rechunk $target_image=image_name $tag=default_tag:
     #!/usr/bin/env bash
     set -xeuo pipefail
-    if [[ ! "${UID}" -eq "0" ]]; then
-    echo "This needs to run as root."
-    exit 1
-    fi
-    RPM_OSTREE_CHUNKER_IMAGE="localhost/${target_image}:${tag}"
-    podman run --rm --pull=never --privileged \
-      -v "/var/lib/containers:/var/lib/containers" \
-      --entrypoint /usr/bin/rpm-ostree \
-      "${RPM_OSTREE_CHUNKER_IMAGE}" \
-      compose build-chunked-oci \
-      --max-layers 127 \
-      --format-version=2 \
-      --bootc \
-      --from "localhost/${target_image}:${tag}" \
-      --output containers-storage:"localhost/${target_image}:${tag}"
+    echo "Skipping ostree-rechunk due to runner disk space constraints"
+    exit 0
 
 generate-default-tag $tag=default_tag:
     #!/usr/bin/env bash
