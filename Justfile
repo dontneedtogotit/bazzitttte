@@ -1,6 +1,5 @@
 set dotenv-filename := "bazzzzite.env"
 set dotenv-load
-set shell := ["bash", "-c"]
 
 export image_name := env_var("IMAGE_NAME")
 export repo_organization := env_var("REPO_ORGANIZATION")
@@ -16,17 +15,21 @@ alias run-vm := run-vm-qcow2
 
 [private]
 default:
+    #!/usr/bin/env bash
     @just --list
 
 check:
+    #!/usr/bin/env bash
     find . -type f -name "*.just" -exec just --unstable --fmt --check -f {} \;
     just --unstable --fmt --check -f Justfile
 
 fix:
+    #!/usr/bin/env bash
     find . -type f -name "*.just" -exec just --unstable --fmt -f {} \;
     just --unstable --fmt -f Justfile || { exit 1; }
 
 clean:
+    #!/usr/bin/env bash
     touch _build
     find *_build* -exec rm -rf {} \;
     rm -f previous.manifest.json
@@ -35,6 +38,7 @@ clean:
     rm -rf output/
 
 build $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
     set -euox pipefail
     BUILD_ARGS=()
     LABELS=()
@@ -59,6 +63,7 @@ build $target_image=image_name $tag=default_tag:
     podman build "${PODMAN_BUILD_ARGS[@]}" .
 
 publish $target_image=image_name $tag=default_tag: (build target_image tag)
+    #!/usr/bin/env bash
     set -euox pipefail
     REGISTRY="ghcr.io/{{ repo_organization }}"
     podman tag "{{ target_image }}:{{ tag }}" "${REGISTRY}/{{ image_name }}:{{ tag }}"
@@ -66,6 +71,7 @@ publish $target_image=image_name $tag=default_tag: (build target_image tag)
     echo "Pushed ${REGISTRY}/{{ image_name }}:{{ tag }}"
 
 ostree-rechunk $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
     set -xeuo pipefail
     if [[ ! "${UID}" -eq "0" ]]; then
     echo "This needs to run as root."
@@ -84,9 +90,11 @@ ostree-rechunk $target_image=image_name $tag=default_tag:
       --output containers-storage:"localhost/${target_image}:${tag}"
 
 generate-default-tag $tag=default_tag:
+    #!/usr/bin/env bash
     echo "${tag}"
 
 generate-build-tags $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
     set -eoux pipefail
     DATE=$(date +%Y%m%d)
     BUILD_TAGS=()
@@ -102,6 +110,7 @@ generate-build-tags $target_image=image_name $tag=default_tag:
     echo "${BUILD_TAGS[@]}"
 
 tag-images $target_image=image_name $tag=default_tag tags="":
+    #!/usr/bin/env bash
     set -eoux pipefail
     IMAGE=$(podman inspect ${target_image}:${tag} | jq -r .[].Id)
     podman untag ${IMAGE}
@@ -111,9 +120,11 @@ tag-images $target_image=image_name $tag=default_tag tags="":
     podman images
 
 image_name $target_image=image_name:
+    #!/usr/bin/env bash
     echo "${image_name}"
 
 _rootful_load_image $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
     set -eoux pipefail
     if [[ -n "${SUDO_USER:-}" || "${UID}" -eq "0" ]]; then
     echo "Already root or running under sudo, no need to load image from user podman."
@@ -136,6 +147,7 @@ _rootful_load_image $target_image=image_name $tag=default_tag:
     fi
 
 _build-bib $target_image $tag $type $config: (_rootful_load_image target_image tag)
+    #!/usr/bin/env bash
     set -euo pipefail
     args="--type ${type} "
     args+="--use-librepo=True "
@@ -161,6 +173,7 @@ rebuild-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_reb
 rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag: && (_rebuild-bib target_image tag "iso" "disk_config/iso.toml")
 
 _run-vm $target_image $tag $type $config:
+    #!/usr/bin/env bash
     set -eoux pipefail
     image_file="output/${type}/disk.${type}"
     if [[ $type == iso ]]; then
@@ -193,6 +206,7 @@ run-vm-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag: && (_ru
 run-vm-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-vm target_image tag "raw" "disk_config/disk.toml")
 run-vm-iso $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-vm target_image tag "iso" "disk_config/iso.toml")
 spawn-vm rebuild="0" type="qcow2" ram="6G":
+    #!/usr/bin/env bash
     set -eoux pipefail
     podman run --rm --privileged --pull=newer \
       --net=host \
@@ -203,10 +217,12 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
       docker.io/qemux/qemu
 
 lint:
+    #!/usr/bin/env bash
     command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not found"; exit 1; }
     find . -iname "*.sh" -type f -exec shellcheck "{}" ';'
     find system_files/usr/libexec -maxdepth 1 -name 'bazzzzite-*' -type f -exec grep -qL '^#!.*python' {} \; -exec shellcheck {} \;
 
 format:
+    #!/usr/bin/env bash
     command -v shfmt >/dev/null 2>&1 || { echo "shfmt not found"; exit 1; }
     find . -iname "*.sh" -type f -exec shfmt --write "{}" ';'
