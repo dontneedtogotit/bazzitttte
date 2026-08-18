@@ -37,8 +37,8 @@ if [[ ! -f /usr/share/vosk-models/vosk-model-small-en-us-0.15/model.tar.gz ]]; t
     fi
 fi
 
-mkdir -p /home/user/.config/bazzzzite/youtube-tv
-mkdir -p /home/user/.config/bazzzzite/youtube-tv-guest
+mkdir -p /home/user/.config/bazzzzite/youtube-tv || true
+mkdir -p /home/user/.config/bazzzzite/youtube-tv-guest || true
 
 if [[ ! -d /home/user/.config/bazzzzite/youtube-tv/Default/Extensions/cjpalhdlnbpafiamejdnhcphjbkeiagm ]]; then
     echo "Installing uBlock Origin for YouTube TV..."
