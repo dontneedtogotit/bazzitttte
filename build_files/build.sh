@@ -20,12 +20,12 @@ dnf5 install -y --skip-unavailable cage chromium mpv jellyfin retroarch dolphin-
     rygel edid-decode firewalld nmap xdotool wmctrl
 
 if command -v firewall-offline-cmd >/dev/null; then
-    firewall-offline-cmd --add-service=jellyfin
+    firewall-offline-cmd --add-service=jellyfin || true
     firewall-offline-cmd --add-service=dhcp
     firewall-offline-cmd --add-service=dns
 fi
 
-systemctl enable jellyfin.service
+systemctl enable jellyfin.service || true
 
 if [[ ! -f /usr/share/vosk-models/vosk-model-small-en-us-0.15/model.tar.gz ]]; then
     echo "Downloading Vosk voice model..."
