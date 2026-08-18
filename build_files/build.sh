@@ -66,9 +66,9 @@ chmod +x /usr/libexec/bazzzzite-update-check
 chmod +x /usr/libexec/bazzzzite-cam
 chmod +x /usr/libexec/bazzzzite-yt-app
 chmod +x /usr/libexec/bazzzzite-yt-cec
-mkdir -p /mnt/media
-mkdir -p /etc/bazzzzite
-mkdir -p /usr/share/vosk-models
+mkdir -p /mnt/media || true
+mkdir -p /etc/bazzzzite || true
+mkdir -p /usr/share/vosk-models || true
 
 if [[ ! -f /etc/bazzzzite/ws-token ]]; then
     head -c 32 /dev/urandom | base64 | tr -d '=+/' > /etc/bazzzzite/ws-token
