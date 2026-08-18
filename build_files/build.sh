@@ -45,7 +45,7 @@ if [[ ! -d /home/user/.config/bazzzzite/youtube-tv/Default/Extensions/cjpalhdlnb
     curl -L -o /tmp/ublock.crx \
         "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=120&acceptformat=crx2,crx3&x=id%3Dcjpalhdlnbpafiamejdnhcphjbkeiagm%26uc" 2>/dev/null || true
     if [[ -f /tmp/ublock.crx ]]; then
-        mkdir -p /home/user/.config/bazzzzite/youtube-tv/Default/Extensions
+        mkdir -p /home/user/.config/bazzzzite/youtube-tv/Default/Extensions || true
         unzip -q /tmp/ublock.crx -d /home/user/.config/bazzzzite/youtube-tv/Default/Extensions/cjpalhdlnbpafiamejdnhcphjbkeiagm 2>/dev/null || true
         rm -f /tmp/ublock.crx
     fi
