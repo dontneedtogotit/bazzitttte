@@ -95,33 +95,33 @@ bazzzzite-iptv-update:
     #!/usr/bin/bash
     set -eou pipefail
     if [[ ! -f /etc/bazzzzite/iptv-url ]]; then
-        echo "No IPTV URL configured. Run ujust bazzzzite-iptv-add first."
-        exit 1
+    echo "No IPTV URL configured. Run ujust bazzzzite-iptv-add first."
+    exit 1
     fi
     url=$(sudo cat /etc/bazzzzite/iptv-url)
     echo "Fetching IPTV channels from $url..."
     mkdir -p /usr/share/bazzzzite/shell/iptv
     curl -s "$url" | python3 -c "
-import sys, json, re
-channels = []
-name = ''
-logo = ''
-url = ''
-for line in sys.stdin:
-    line = line.strip()
-    if line.startswith('#EXTINF:'):
-        m = re.search(',(.*)$', line)
-        if m: name = m.group(1)
-        m = re.search('tvg-logo=\"([^\"]+)\"', line)
-        if m: logo = m.group(1)
-    elif line and not line.startswith('#'):
-        url = line
-        channels.append({'name': name, 'logo': logo, 'url': url})
-        name = logo = url = ''
-with open('/usr/share/bazzzzite/shell/iptv/channels.json', 'w') as f:
-    json.dump(channels, f)
-print(f'Loaded {len(channels)} channels')
-" || echo "Failed to parse m3u"
+        import sys, json, re
+        channels = []
+        name = ''
+        logo = ''
+        url = ''
+        for line in sys.stdin:
+            line = line.strip()
+            if line.startswith('#EXTINF:'):
+                m = re.search(',(.*)$', line)
+                if m: name = m.group(1)
+                m = re.search('tvg-logo=\"([^\"]+)\"', line)
+                if m: logo = m.group(1)
+            elif line and not line.startswith('#'):
+                url = line
+                channels.append({'name': name, 'logo': logo, 'url': url})
+                name = logo = url = ''
+        with open('/usr/share/bazzzzite/shell/iptv/channels.json', 'w') as f:
+            json.dump(channels, f)
+        print(f'Loaded {len(channels)} channels')
+    " || echo "Failed to parse m3u"
     echo "Restart TV shell to see channels: ujust bazzzzite-restart-shell"
 
 [group('Bazzzzite TV')]

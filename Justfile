@@ -1,5 +1,5 @@
 set dotenv-filename := "bazzzzite.env"
-set dotenv-load := true
+set dotenv-load
 
 export image_name := env_var("IMAGE_NAME")
 export repo_organization := env_var("REPO_ORGANIZATION")
@@ -18,15 +18,11 @@ default:
     @just --list
 
 check:
-    find . -type f -name "*.just" | while read -r file; do
-        just --unstable --fmt --check -f $file
-    done
+    find . -type f -name "*.just" -exec just --unstable --fmt --check -f {} \;
     just --unstable --fmt --check -f Justfile
 
 fix:
-    find . -type f -name "*.just" | while read -r file; do
-        just --unstable --fmt -f $file
-    done
+    find . -type f -name "*.just" -exec just --unstable --fmt -f {} \;
     just --unstable --fmt -f Justfile || { exit 1; }
 
 clean:
@@ -42,12 +38,12 @@ build $target_image=image_name $tag=default_tag:
     BUILD_ARGS=()
     LABELS=()
     if [[ -z "$(git status -s)" ]]; then
-        GIT_SHA=$(git rev-parse --short HEAD)
-        LABELS+=("--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/{{ repo_organization }}/{{ image_name }}/${GIT_SHA}/README.md")
-        LABELS+=("--label" "org.opencontainers.image.documentation=https://raw.githubusercontent.com/{{ repo_organization }}/{{ image_name }}/${GIT_SHA}/README.md")
-        LABELS+=("--label" "org.opencontainers.image.source=https://github.com/{{ repo_organization }}/{{ image_name }}/blob/${GIT_SHA}/Containerfile")
-        LABELS+=("--label" "org.opencontainers.image.url=https://github.com/{{ repo_organization }}/{{ image_name }}/tree/${GIT_SHA}")
-        LABELS+=("--label" "org.opencontainers.image.version={{ default_tag }}.$(date +%Y%m%d)-${GIT_SHA}")
+    GIT_SHA=$(git rev-parse --short HEAD)
+    LABELS+=("--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/{{ repo_organization }}/{{ image_name }}/${GIT_SHA}/README.md")
+    LABELS+=("--label" "org.opencontainers.image.documentation=https://raw.githubusercontent.com/{{ repo_organization }}/{{ image_name }}/${GIT_SHA}/README.md")
+    LABELS+=("--label" "org.opencontainers.image.source=https://github.com/{{ repo_organization }}/{{ image_name }}/blob/${GIT_SHA}/Containerfile")
+    LABELS+=("--label" "org.opencontainers.image.url=https://github.com/{{ repo_organization }}/{{ image_name }}/tree/${GIT_SHA}")
+    LABELS+=("--label" "org.opencontainers.image.version={{ default_tag }}.$(date +%Y%m%d)-${GIT_SHA}")
     fi
     LABELS+=("--label" "io.artifacthub.package.deprecated=false")
     LABELS+=("--label" "io.artifacthub.package.keywords={{ image_keywords }}")
@@ -71,8 +67,8 @@ publish $target_image=image_name $tag=default_tag: (build target_image tag)
 ostree-rechunk $target_image=image_name $tag=default_tag:
     set -xeuo pipefail
     if [[ ! "${UID}" -eq "0" ]]; then
-      echo "This needs to run as root."
-      exit 1
+    echo "This needs to run as root."
+    exit 1
     fi
     RPM_OSTREE_CHUNKER_IMAGE="localhost/${target_image}:${tag}"
     podman run --rm --pull=never --privileged \
@@ -94,10 +90,10 @@ generate-build-tags $target_image=image_name $tag=default_tag:
     DATE=$(date +%Y%m%d)
     BUILD_TAGS=()
     if [[ -z "$(git status -s)" ]]; then
-        GIT_SHA=$(git rev-parse --short HEAD)
-        BUILD_TAGS+=("${tag}-${GIT_SHA}")
-        BUILD_TAGS+=("${tag}-${DATE}-${GIT_SHA}")
-        BUILD_TAGS+=("${DATE}-${GIT_SHA}")
+    GIT_SHA=$(git rev-parse --short HEAD)
+    BUILD_TAGS+=("${tag}-${GIT_SHA}")
+    BUILD_TAGS+=("${tag}-${DATE}-${GIT_SHA}")
+    BUILD_TAGS+=("${DATE}-${GIT_SHA}")
     fi
     BUILD_TAGS+=("${DATE}")
     BUILD_TAGS+=("${tag}")
@@ -109,7 +105,7 @@ tag-images $target_image=image_name $tag=default_tag tags="":
     IMAGE=$(podman inspect ${target_image}:${tag} | jq -r .[].Id)
     podman untag ${IMAGE}
     for tag in {{ tags }}; do
-        podman tag $IMAGE "${target_image}:${tag}"
+    podman tag $IMAGE "${target_image}:${tag}"
     done
     podman images
 
@@ -119,8 +115,8 @@ image_name $target_image=image_name:
 _rootful_load_image $target_image=image_name $tag=default_tag:
     set -eoux pipefail
     if [[ -n "${SUDO_USER:-}" || "${UID}" -eq "0" ]]; then
-        echo "Already root or running under sudo, no need to load image from user podman."
-        exit 0
+    echo "Already root or running under sudo, no need to load image from user podman."
+    exit 0
     fi
     set +e
     resolved_tag=$(podman inspect -t image "${target_image}:${tag}" | jq -r '.[].RepoTags.[0]')
@@ -128,14 +124,14 @@ _rootful_load_image $target_image=image_name $tag=default_tag:
     set -e
     USER_IMG_ID=$(podman images --filter reference="${target_image}:${tag}" --format "'{{ '{{.ID}}' }}'")
     if [[ $return_code -eq 0 ]]; then
-        ID=$(just sudoif podman images --filter reference="${target_image}:${tag}" --format "'{{ '{{.ID}}' }}'")
-        if [[ "$ID" != "$USER_IMG_ID" ]]; then
-            COPYTMP=$(mktemp -p "${PWD}" -d -t _build_podman_scp.XXXXXXXXXX)
-            just sudoif TMPDIR=${COPYTMP} podman image scp ${UID}@localhost::"${target_image}:${tag}" root@localhost::"${target_image}:${tag}"
-            rm -rf "${COPYTMP}"
-        fi
+    ID=$(just sudoif podman images --filter reference="${target_image}:${tag}" --format "'{{ '{{.ID}}' }}'")
+    if [[ "$ID" != "$USER_IMG_ID" ]]; then
+    COPYTMP=$(mktemp -p "${PWD}" -d -t _build_podman_scp.XXXXXXXXXX)
+    just sudoif TMPDIR=${COPYTMP} podman image scp ${UID}@localhost::"${target_image}:${tag}" root@localhost::"${target_image}:${tag}"
+    rm -rf "${COPYTMP}"
+    fi
     else
-        just sudoif podman pull "${target_image}:${tag}"
+    just sudoif podman pull "${target_image}:${tag}"
     fi
 
 _build-bib $target_image $tag $type $config: (_rootful_load_image target_image tag)
@@ -167,14 +163,14 @@ _run-vm $target_image $tag $type $config:
     set -eoux pipefail
     image_file="output/${type}/disk.${type}"
     if [[ $type == iso ]]; then
-        image_file="output/bootiso/install.iso"
+    image_file="output/bootiso/install.iso"
     fi
     if [[ ! -f "${image_file}" ]]; then
-        just "build-${type}" "$target_image" "$tag"
+    just "build-${type}" "$target_image" "$tag"
     fi
     port=8006
     while grep -q :${port} <<< $(ss -tunalp); do
-        port=$(( port + 1 ))
+    port=$(( port + 1 ))
     done
     echo "Using Port: ${port}"
     echo "Connect to http://localhost:${port}"
