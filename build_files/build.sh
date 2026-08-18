@@ -12,7 +12,6 @@ systemctl mask geoclue.service
 
 systemctl enable bazzzzite-tv-shell.service
 systemctl enable bazzzzite-cecd.service
-systemctl enable jellyfin.service
 
 if command -v firewall-offline-cmd >/dev/null; then
     firewall-offline-cmd --add-service=jellyfin
@@ -25,6 +24,8 @@ dnf5 install -y cage chromium mpv jellyfin retroarch dolphin-emu \
     gamemode igt-gpu-tools python3-pip python3-gobject python3-dbus \
     python3-websockets python3-aiohttp python3-vosk qt6-qtbase qt6-qtwayland qt6-qtsvg \
     rygel edid-decode firewalld nmap xdotool wmctrl
+
+systemctl enable jellyfin.service
 
 if [[ ! -f /usr/share/vosk-models/vosk-model-small-en-us-0.15/model.tar.gz ]]; then
     echo "Downloading Vosk voice model..."
