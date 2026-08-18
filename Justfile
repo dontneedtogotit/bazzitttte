@@ -1,5 +1,6 @@
 set dotenv-filename := "bazzzzite.env"
 set dotenv-load
+set shell := ["bash", "-c"]
 
 export image_name := env_var("IMAGE_NAME")
 export repo_organization := env_var("REPO_ORGANIZATION")
