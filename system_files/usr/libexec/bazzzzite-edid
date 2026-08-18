@@ -4,7 +4,6 @@
 set -euo pipefail
 
 EDID_PATH="/sys/class/drm/card0-HDMI-A-1/edid"
-KERNEL_CMD="/proc/cmdline"
 CONF_FILE="/etc/bazzzzite/edid-mode"
 
 if [[ ! -r "$EDID_PATH" ]]; then
@@ -12,7 +11,7 @@ if [[ ! -r "$EDID_PATH" ]]; then
     exit 1
 fi
 
-MODES=$(cat "$EDID_PATH" | edid-decode 2>/dev/null | grep -oP '\d{3,4}x\d{3,4}@\d+' | sort -u || true)
+MODES=$(edid-decode < "$EDID_PATH" 2>/dev/null | grep -oP '\d{3,4}x\d{3,4}@\d+' | sort -u || true)
 
 if [[ -z "$MODES" ]]; then
     echo "Could not decode EDID modes. Install edid-decode or use manual mode."

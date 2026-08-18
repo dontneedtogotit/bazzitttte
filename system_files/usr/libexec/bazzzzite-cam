@@ -127,17 +127,18 @@ watch_loop() {
 
 scan_network() {
     echo "Scanning local network for RTSP cameras..."
-    local subnet=$(ip route | grep default | awk '{print $5}' | head -1)
-    local gateway=$(ip route | grep default | awk '{print $3}' | head -1)
+    local gateway
+    gateway=$(ip route | grep default | awk '{print $3}' | head -1)
     if [[ -z "$gateway" ]]; then
         echo "Could not detect gateway. Please check your network connection."
         exit 1
     fi
-    local base=$(echo "$gateway" | awk -F. '{print $1"."$2"."$3".0/24"}')
+    local base
+    base=$(echo "$gateway" | awk -F. '{print $1"."$2"."$3".0/24"}')
     echo "Scanning subnet: $base"
     echo "This may take a minute..."
     
-    nmap -p 554,8080,80,443 --open "$base" 2>/dev/null | grep -E "Nmap scan report|open" | awk '/Nmap scan report/{host=$5}/open/{print host, $3}' | while read host port; do
+    nmap -p 554,8080,80,443 --open "$base" 2>/dev/null | grep -E "Nmap scan report|open" | awk '/Nmap scan report/{host=$5}/open/{print host, $3}' | while read -r host port; do
         echo "Possible camera: rtsp://${host}:${port}/"
     done
     echo "Scan complete."

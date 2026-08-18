@@ -204,7 +204,7 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
 lint:
     command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not found"; exit 1; }
     find . -iname "*.sh" -type f -exec shellcheck "{}" ';'
-    shellcheck system_files/usr/libexec/bazzzzite-*
+    find system_files/usr/libexec -maxdepth 1 -name 'bazzzzite-*' -type f -exec grep -qL '^#!.*python' {} \; -exec shellcheck {} \;
 
 format:
     command -v shfmt >/dev/null 2>&1 || { echo "shfmt not found"; exit 1; }
