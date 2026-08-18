@@ -13,17 +13,17 @@ systemctl mask geoclue.service
 systemctl enable bazzzzite-tv-shell.service
 systemctl enable bazzzzite-cecd.service
 
-if command -v firewall-offline-cmd >/dev/null; then
-    firewall-offline-cmd --add-service=jellyfin
-    firewall-offline-cmd --add-service=dhcp
-    firewall-offline-cmd --add-service=dns
-fi
-
 dnf5 install -y cage chromium mpv jellyfin retroarch dolphin-emu \
     libcec cec-utils ffmpeg yt-dlp lm_sensors smartmontools \
     gamemode igt-gpu-tools python3-pip python3-gobject python3-dbus \
     python3-websockets python3-aiohttp python3-vosk qt6-qtbase qt6-qtwayland qt6-qtsvg \
     rygel edid-decode firewalld nmap xdotool wmctrl
+
+if command -v firewall-offline-cmd >/dev/null; then
+    firewall-offline-cmd --add-service=jellyfin
+    firewall-offline-cmd --add-service=dhcp
+    firewall-offline-cmd --add-service=dns
+fi
 
 systemctl enable jellyfin.service
 
