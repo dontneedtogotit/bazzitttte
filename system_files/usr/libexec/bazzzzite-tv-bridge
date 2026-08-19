@@ -226,9 +226,14 @@ async def handle_ws_message(ws, data):
     elif action == "os_check_update":
         try:
             res = subprocess.run(["bootc", "upgrade", "--check"], capture_output=True, text=True, timeout=30)
-            output = res.stdout + res.stderr
-            has_update = "update available" in output.lower() or "new" in output.lower()
-            await ws.send_json({"action": "os_update_status", "payload": {"available": has_update, "output": output}})
+            output = (res.stdout + res.stderr).strip()
+            if res.returncode != 0:
+                await ws.send_json({"action": "os_update_status", "payload": {
+                    "available": False, "error": output or f"bootc exited {res.returncode}"
+                }})
+            else:
+                has_update = "update available" in output.lower()
+                await ws.send_json({"action": "os_update_status", "payload": {"available": has_update, "output": output}})
         except Exception as e:
             await ws.send_json({"action": "os_update_status", "payload": {"available": False, "error": str(e)}})
 

@@ -2,7 +2,7 @@
 
 Custom [bootc](https://bootc.dev/) image turning an **Intel NUC7i5BNH** into a replacement smart TV OS.
 
-Derived from [Bazzite Desktop (KDE)](https://github.com/ublue-os/bazzite) and published to GHCR as `ghcr.io/getoffover/bazzzzite`.
+Derived from [Bazzite Desktop (KDE)](https://github.com/ublue-os/bazzite) and published to GHCR as `ghcr.io/dontneedtogotit/bazzitttte`.
 
 ## What it is
 
@@ -50,7 +50,7 @@ A **real TV operating system** that replaces your TV's dead smart features and K
 1. **Rebase from stock Bazzite:**
 
 ```bash
-sudo bootc switch ghcr.io/getoffover/bazzzzite:latest
+sudo bootc switch ghcr.io/dontneedtogotit/bazzitttte:latest
 sudo reboot
 ```
 
