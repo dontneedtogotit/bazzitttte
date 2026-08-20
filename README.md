@@ -143,9 +143,10 @@ ujust bazzzzite-edid            # Detect optimal HDMI mode for your TV
 ujust bazzzzite-update          # OTA update + flatpak update
 ujust bazzzzite-rollback        # Rollback to previous OS image
 ujust bazzzzite-update-status   # Check for updates without applying
-ujust bazzzzite-yt-app          # Launch YouTube TV (account mode)
-ujust bazzzzite-yt-app-guest    # Launch YouTube TV (guest/incognito mode)
-ujust bazzzzite-yt-app-stop     # Exit YouTube TV and return to home
+ujust bazzzzite-yt-app          # Launch YouTube (account mode, ad-blocked)
+ujust bazzzzite-yt-app-guest    # Launch YouTube (guest mode, ad-blocked, wiped on every launch)
+ujust bazzzzite-yt-signin       # Windowed Google sign-in for the account profile
+ujust bazzzzite-yt-app-stop     # Exit YouTube and return to home
 ```
 
 ## Storage layout (256GB NVMe)
@@ -194,29 +195,32 @@ YouTube TV launches a dedicated fullscreen YouTube experience, similar to Samsun
 
 ### Features
 - **Fullscreen TV interface** (`youtube.com/tv`) optimized for 10-foot UI
-- **Login support** — persistent cookies in dedicated profile
-- **Ad blocking** — uBlock Origin pre-installed
-- **Guest mode** — incognito profile for quick sessions
-- **CEC remote navigation** — works directly in YouTube TV
+- **Login support** — persistent profile, plus a windowed one-time sign-in flow for easier Google 2FA
+- **Ad blocking** — uBlock Origin loaded in *both* account and guest mode
+- **Guest mode** — a real profile that's wiped clean before every launch (not Chromium's built-in Incognito, so ad blocking still works)
+- **No mouse pointer** — hidden for an authentic remote-control feel
+- **CEC remote navigation** — works directly in YouTube
 - **Hardware acceleration** — VA-API video decoding
 
 ### How to use
-1. **From Apps tab:** Select **YouTube TV** (account) or **YouTube TV Guest** (incognito)
-2. **From CLI:**
+1. **First time only — sign in:** `ujust bazzzzite-yt-signin` opens a normal windowed browser (not kiosk) so Google's login/2FA flow works smoothly. Sign in, then exit (Escape) — the session persists in the account profile.
+2. **From Apps tab:** Select **YouTube** (account) or **YouTube Guest**
+3. **From CLI:**
    ```bash
    ujust bazzzzite-yt-app        # account mode
    ujust bazzzzite-yt-app-guest  # guest mode
+   ujust bazzzzite-yt-signin     # windowed sign-in
    ujust bazzzzite-yt-app-stop   # exit back to TV shell
    ```
-3. **Navigation:** Use your Samsung remote (arrow keys, Enter, Back, Play/Pause)
-4. **Exit:** Press Back/Escape on your remote or keyboard
+4. **Navigation:** Use your Samsung remote (arrow keys, Enter, Back, Play/Pause)
+5. **Exit:** Press Back/Escape on your remote or keyboard
 
 ### Profiles
 - **Account mode:** Uses `~/.config/bazzzzite/youtube-tv` — login persists across sessions
-- **Guest mode:** Uses incognito — no cookies saved, perfect for temporary use
+- **Guest mode:** Uses `~/.config/bazzzzite/youtube-tv-guest`, which is deleted and recreated at the start of every launch — nothing persists, but it's a real profile so uBlock and other mods still apply
 
 ### Switching between account and guest
-1. Exit YouTube TV (`ujust bazzzzite-yt-app-stop`)
+1. Exit YouTube (`ujust bazzzzite-yt-app-stop`)
 2. Launch the other mode (`ujust bazzzzite-yt-app` or `ujust bazzzzite-yt-app-guest`)
 
 ## DLNA / Casting

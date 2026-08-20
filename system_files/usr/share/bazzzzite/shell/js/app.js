@@ -50,7 +50,7 @@ class TVApp {
         }).catch(() => {
             this.openWebSocket();
         });
-    },
+    }
 
     async fetchAuthToken() {
         try {
@@ -63,7 +63,7 @@ class TVApp {
             console.error('Failed to fetch auth token:', e);
         }
         return null;
-    },
+    }
 
     openWebSocket() {
         const wsUrl = `ws://${window.location.hostname}:8080/ws`;
@@ -199,9 +199,24 @@ class TVApp {
     }
 
     setupYouTube() {
+        const ytApps = [
+            { name: 'Continue as You', icon: '▶', app: 'youtube-tv' },
+            { name: 'Guest', icon: '👤', app: 'youtube-tv-guest' },
+            { name: 'Sign in to YouTube', icon: '🔑', app: 'youtube-tv-setup' },
+        ];
+        const ytAppRow = document.getElementById('yt-app-row');
+        if (ytAppRow) {
+            ytApps.forEach(a => {
+                const el = this.createItem(a.name, a.icon, '');
+                el.dataset.type = 'app';
+                el.dataset.app = a.app;
+                ytAppRow.appendChild(el);
+            });
+        }
+
         const searchBtn = document.getElementById('yt-search-btn');
         const searchInput = document.getElementById('yt-search-input');
-        
+
         if (searchBtn) {
             searchBtn.addEventListener('click', () => {
                 const query = searchInput.value.trim();
@@ -444,10 +459,10 @@ class TVApp {
                 this.ws.send(JSON.stringify({action: 'system_shutdown'}));
                 break;
             case 'tv-scale-up':
-                Settings.save('scale', Math.min(2.0, (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale')) || 1)) + 0.1));
+                Settings.save('scale', Math.min(2.0, (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale')) || 1) + 0.1));
                 break;
             case 'tv-scale-down':
-                Settings.save('scale', Math.max(0.8, (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale')) || 1)) - 0.1));
+                Settings.save('scale', Math.max(0.8, (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale')) || 1) - 0.1));
                 break;
             case 'cec-test':
                 this.launchApp('cec-test');
@@ -514,9 +529,9 @@ class TVApp {
     async loadApps() {
         const apps = [
             { name: 'Jellyfin', icon: 'J', url: 'http://localhost:8096', type: 'web' },
-            { name: 'YouTube', icon: '▶', url: 'https://youtube.com/tv', type: 'web' },
-            { name: 'YouTube TV', icon: '📺', app: 'youtube-tv', type: 'app' },
-            { name: 'YouTube TV Guest', icon: '👤', app: 'youtube-tv-guest', type: 'app' },
+            { name: 'YouTube', icon: '▶', app: 'youtube-tv', type: 'app' },
+            { name: 'YouTube Guest', icon: '👤', app: 'youtube-tv-guest', type: 'app' },
+            { name: 'Sign in to YouTube', icon: '🔑', app: 'youtube-tv-setup', type: 'app' },
             { name: 'Twitch', icon: 'T', url: 'https://twitch.tv', type: 'web' },
             { name: 'Spotify', icon: 'S', url: 'https://open.spotify.com', type: 'web' },
             { name: 'File Manager', icon: '📁', app: 'filemanager', type: 'app' },

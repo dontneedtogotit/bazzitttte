@@ -242,20 +242,27 @@ bazzzzite-cam-scan:
 bazzzzite-yt-app:
     #!/usr/bin/bash
     set -eou pipefail
-    echo "Starting YouTube TV (account mode)..."
-    systemctl --user start bazzzzite-yt-app.service
+    echo "Starting YouTube (account mode)..."
+    systemctl --user start bazzzzite-yt-app@account.service
 
 [group('Bazzzzite TV')]
 bazzzzite-yt-app-guest:
     #!/usr/bin/bash
     set -eou pipefail
-    echo "Starting YouTube TV (guest mode)..."
-    systemctl --user start bazzzzite-yt-app-guest.service
+    echo "Starting YouTube (guest mode)..."
+    systemctl --user start bazzzzite-yt-app@guest.service
+
+[group('Bazzzzite TV')]
+bazzzzite-yt-signin:
+    #!/usr/bin/bash
+    set -eou pipefail
+    echo "Opening Google sign-in for YouTube (windowed)..."
+    systemctl --user start bazzzzite-yt-app@setup.service
 
 [group('Bazzzzite TV')]
 bazzzzite-yt-app-stop:
     #!/usr/bin/bash
     set -eou pipefail
-    systemctl --user stop bazzzzite-yt-app.service bazzzzite-yt-app-guest.service
-    echo "YouTube TV stopped. Returning to TV shell..."
+    systemctl --user stop bazzzzite-yt-app@account.service bazzzzite-yt-app@guest.service bazzzzite-yt-app@setup.service
+    echo "YouTube stopped. Returning to TV shell..."
     sudo systemctl start bazzzzite-tv-shell.service

@@ -123,31 +123,18 @@ def launch_yt_app(mode="account"):
     global yt_app_process
     if yt_app_process and yt_app_process.poll() is None:
         return "already running"
-    
-    profile_dir = "/home/user/.config/bazzzzite/youtube-tv-guest" if mode == "guest" else "/home/user/.config/bazzzzite/youtube-tv"
-    extra_args = ["--incognito"] if mode == "guest" else []
-    
-    cmd = [
-        "/usr/bin/cage", "--br", "-s", "--",
-        "/usr/bin/chromium",
-            "--user-data-dir=" + profile_dir,
-            "--kiosk", "--noerrdialogs", "--disable-infobars",
-            "--disable-features=Translate",
-            "--ozone-platform=wayland",
-            "--enable-features=VaapiVideoDecoder",
-            "--ignore-gpu-blocklist",
-            "--enable-zero-copy",
-            "--disable-pinch", "--disable-zoom",
-            "--disable-session-crashed-bubble",
-    ] + extra_args + [
-            "https://www.youtube.com/tv"
-    ]
-    
-    yt_app_process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
-    # Start CEC navigation daemon for YouTube TV
-    subprocess.Popen(["/usr/libexec/bazzzzite-yt-cec"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
+
+    # Delegate to bazzzzite-yt-app so the launch flags (ad-block extension,
+    # cursor hiding, guest wipe, setup mode) live in exactly one place.
+    yt_app_process = subprocess.Popen(
+        ["/usr/libexec/bazzzzite-yt-app", mode],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+
+    if mode != "setup":
+        # Start CEC navigation daemon for YouTube
+        subprocess.Popen(["/usr/libexec/bazzzzite-yt-cec"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     return "started"
 
 
@@ -375,13 +362,14 @@ async def handle_ws_message(ws, data):
         allowed_apps = {
             "retroarch", "kodi", "jellyfin", "cec-test", "gpu-stats", "edid",
             "filemanager", "youtube", "netflix", "twitch", "spotify",
-            "youtube-tv", "youtube-tv-guest"
+            "youtube-tv", "youtube-tv-guest", "youtube-tv-setup"
         }
         if app not in allowed_apps:
             await ws.send_json({"action": "error", "payload": {"message": "app not allowed"}})
             return
-        if app in ("youtube-tv", "youtube-tv-guest"):
-            result = launch_yt_app(app)
+        yt_modes = {"youtube-tv": "account", "youtube-tv-guest": "guest", "youtube-tv-setup": "setup"}
+        if app in yt_modes:
+            result = launch_yt_app(yt_modes[app])
             await ws.send_json({"action": "app_launched", "payload": {"app": app, "status": result}})
             return
         if app == "retroarch":

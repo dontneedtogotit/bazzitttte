@@ -1,0 +1,4 @@
+/* Real TV apps never show a mouse pointer; this is a remote-control interface. */
+html, html * {
+    cursor: none !important;
+}

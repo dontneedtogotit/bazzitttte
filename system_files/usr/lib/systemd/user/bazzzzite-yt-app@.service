@@ -1,16 +1,13 @@
 [Unit]
-Description=YouTube TV (fullscreen app)
+Description=YouTube (%i mode, fullscreen app)
 After=graphical-session.target bazzzzite-tv-bridge.service
 Conflicts=bazzzzite-tv-shell.service
 
 [Service]
 Type=simple
-ExecStart=/usr/libexec/bazzzzite-yt-app account
+ExecStart=/usr/libexec/bazzzzite-yt-app %i
 Restart=on-failure
 RestartSec=5
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 Environment=DISPLAY=:0
 Environment=WAYLAND_DISPLAY=wayland-0
-
-[Install]
-WantedBy=graphical-session.target

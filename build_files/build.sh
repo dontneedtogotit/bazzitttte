@@ -40,13 +40,16 @@ fi
 mkdir -p /home/user/.config/bazzzzite/youtube-tv || true
 mkdir -p /home/user/.config/bazzzzite/youtube-tv-guest || true
 
-if [[ ! -d /home/user/.config/bazzzzite/youtube-tv/Default/Extensions/cjpalhdlnbpafiamejdnhcphjbkeiagm ]]; then
-    echo "Installing uBlock Origin for YouTube TV..."
+# Extracted once to a stable system path (not inside a profile dir) so it survives
+# the guest profile being wiped before every launch, and loads via --load-extension
+# for both account and guest mode.
+if [[ ! -d /usr/share/bazzzzite/ublock-origin ]]; then
+    echo "Installing uBlock Origin for YouTube..."
     curl -L -o /tmp/ublock.crx \
         "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=120&acceptformat=crx2,crx3&x=id%3Dcjpalhdlnbpafiamejdnhcphjbkeiagm%26uc" 2>/dev/null || true
     if [[ -f /tmp/ublock.crx ]]; then
-        mkdir -p /home/user/.config/bazzzzite/youtube-tv/Default/Extensions || true
-        unzip -q /tmp/ublock.crx -d /home/user/.config/bazzzzite/youtube-tv/Default/Extensions/cjpalhdlnbpafiamejdnhcphjbkeiagm 2>/dev/null || true
+        mkdir -p /usr/share/bazzzzite/ublock-origin || true
+        unzip -q /tmp/ublock.crx -d /usr/share/bazzzzite/ublock-origin 2>/dev/null || true
         rm -f /tmp/ublock.crx
     fi
 fi

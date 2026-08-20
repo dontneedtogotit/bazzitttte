@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Bazzzzite YouTube TV Mods",
+  "version": "1.0",
+  "description": "Hides the mouse pointer on youtube.com/tv for an authentic 10-foot remote-control feel.",
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "css": ["cursor.css"],
+      "run_at": "document_start"
+    }
+  ]
+}

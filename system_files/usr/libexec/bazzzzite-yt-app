@@ -1,22 +1,37 @@
 #!/usr/bin/env bash
-# bazzzzite-yt-app: launch YouTube TV as a fullscreen app
-# Usage: bazzzzite-yt-app [guest|account]
+# bazzzzite-yt-app: launch YouTube (living-room/TV interface) as a fullscreen app
+# Usage: bazzzzite-yt-app [account|guest|setup]
+#   account: persistent login, ad-blocked, cursor hidden (daily driver)
+#   guest:   same as account but the profile is wiped before every launch
+#            (a real profile, not --incognito, so ad-blocking still works)
+#   setup:   one-time windowed sign-in flow for the account profile
 set -euo pipefail
 
 MODE="${1:-account}"
 YT_PROFILE_DIR="/home/user/.config/bazzzzite/youtube-tv"
 YT_GUEST_DIR="/home/user/.config/bazzzzite/youtube-tv-guest"
+YT_MODS_EXT="/usr/share/bazzzzite/yt-mods"
+UBLOCK_EXT="/usr/share/bazzzzite/ublock-origin"
 
 mkdir -p "$YT_PROFILE_DIR" "$YT_GUEST_DIR"
 
 case "$MODE" in
     guest)
+        rm -rf "${YT_GUEST_DIR:?}"/*
         PROFILE_DIR="$YT_GUEST_DIR"
-        EXTRA_ARGS="--incognito"
+        WINDOW_ARGS=(--kiosk --noerrdialogs --disable-infobars)
+        URL="https://www.youtube.com/tv"
+        ;;
+    setup)
+        PROFILE_DIR="$YT_PROFILE_DIR"
+        WINDOW_ARGS=()
+        URL="https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fwww.youtube.com%2Ftv"
         ;;
     account|*)
+        MODE="account"
         PROFILE_DIR="$YT_PROFILE_DIR"
-        EXTRA_ARGS=""
+        WINDOW_ARGS=(--kiosk --noerrdialogs --disable-infobars)
+        URL="https://www.youtube.com/tv"
         ;;
 esac
 
@@ -26,13 +41,23 @@ export XDG_RUNTIME_DIR="/run/user/${USER_UID}"
 export DISPLAY=":0"
 export WAYLAND_DISPLAY="wayland-0"
 
-echo "Starting YouTube TV (${MODE} mode)..."
+echo "Starting YouTube (${MODE} mode)..."
+
+EXT_DIRS=()
+if [[ "$MODE" != "setup" ]]; then
+    [[ -d "$UBLOCK_EXT" ]] && EXT_DIRS+=("$UBLOCK_EXT")
+    [[ -d "$YT_MODS_EXT" ]] && EXT_DIRS+=("$YT_MODS_EXT")
+fi
+EXT_ARGS=()
+if [[ ${#EXT_DIRS[@]} -gt 0 ]]; then
+    EXT_ARGS=(--load-extension="$(IFS=,; echo "${EXT_DIRS[*]}")")
+fi
 
 exec runuser -u "$USER_NAME" -- dbus-run-session -- \
     /usr/bin/cage --br -s -- \
     /usr/bin/chromium \
         --user-data-dir="$PROFILE_DIR" \
-        --kiosk --noerrdialogs --disable-infobars \
+        "${WINDOW_ARGS[@]}" \
         --disable-features=Translate \
         --ozone-platform=wayland \
         --enable-features=VaapiVideoDecoder \
@@ -41,5 +66,5 @@ exec runuser -u "$USER_NAME" -- dbus-run-session -- \
         --disable-pinch \
         --disable-zoom \
         --disable-session-crashed-bubble \
-        $EXTRA_ARGS \
-        "https://www.youtube.com/tv"
+        "${EXT_ARGS[@]}" \
+        "$URL"
