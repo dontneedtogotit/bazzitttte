@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Bazzzzite TV
+Comment=Kiosk TV shell (Cage + Chromium)
+Exec=/usr/libexec/bazzzzite-tv-session
+Type=Application
+DesktopNames=Bazzzzite

@@ -9,4 +9,4 @@ Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=bazzzzite-tv-shell.service
+WantedBy=multi-user.target

@@ -5,7 +5,7 @@ bazzzzite-status:
     echo "== Bazzzzite TV Status =="
     echo
     echo "== TV Shell =="
-    systemctl status bazzzzite-tv-shell.service --no-pager 2>/dev/null || echo "TV shell not running"
+    systemctl status display-manager.service --no-pager 2>/dev/null || echo "TV session not running"
     echo
     echo "== TV Bridge =="
     systemctl status bazzzzite-tv-bridge.service --no-pager 2>/dev/null || echo "Bridge not running"
@@ -38,7 +38,8 @@ bazzzzite-status:
 bazzzzite-restart-shell:
     #!/usr/bin/bash
     set -eou pipefail
-    sudo systemctl restart bazzzzite-tv-shell.service bazzzzite-tv-bridge.service bazzzzite-cecd.service
+    sudo systemctl restart bazzzzite-tv-bridge.service bazzzzite-cecd.service
+    sudo systemctl restart display-manager.service
 
 [group('Bazzzzite TV')]
 bazzzzite-test-cec:
@@ -265,4 +266,3 @@ bazzzzite-yt-app-stop:
     set -eou pipefail
     systemctl --user stop bazzzzite-yt-app@account.service bazzzzite-yt-app@guest.service bazzzzite-yt-app@setup.service
     echo "YouTube stopped. Returning to TV shell..."
-    sudo systemctl start bazzzzite-tv-shell.service

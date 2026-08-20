@@ -24,8 +24,8 @@ case "${1:-status}" in
         for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
             echo "schedutil" > "$cpu/cpufreq/scaling_governor" 2>/dev/null || true
         done
-        echo "Restarting Cage..."
-        systemctl restart bazzzzite-tv-shell.service 2>/dev/null || true
+        echo "Restarting the TV session..."
+        systemctl restart display-manager.service 2>/dev/null || true
         echo "Game mode disabled. TV shell restored."
         ;;
     status)

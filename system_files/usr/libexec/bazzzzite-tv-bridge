@@ -31,7 +31,6 @@ PROFILES_FILE = Path("/etc/bazzzzite/profiles.json")
 AUTH_TOKEN_FILE = Path("/etc/bazzzzite/ws-token")
 
 mpv_process = None
-yt_app_process = None
 ws_clients = set()
 current_profile = "default"
 
@@ -119,17 +118,30 @@ def stop_mpv():
     return "not running"
 
 
-def launch_yt_app(mode="account"):
-    global yt_app_process
-    if yt_app_process and yt_app_process.poll() is None:
-        return "already running"
+def session_user():
+    """First regular account — the one the display manager auto-logs in."""
+    import pwd
+    for entry in pwd.getpwall():
+        if 1000 <= entry.pw_uid < 60000:
+            return entry.pw_name
+    return None
 
-    # Delegate to bazzzzite-yt-app so the launch flags (ad-block extension,
-    # cursor hiding, guest wipe, setup mode) live in exactly one place.
-    yt_app_process = subprocess.Popen(
-        ["/usr/libexec/bazzzzite-yt-app", mode],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+
+def launch_yt_app(mode="account"):
+    # The YouTube app must run inside the user's graphical session (it nests a
+    # Cage instance on top of the TV shell), so start it as a user unit rather
+    # than spawning a compositor from this root service.
+    user = session_user()
+    if not user:
+        return "no user session"
+
+    unit = "bazzzzite-yt-app@{}.service".format(mode)
+    res = subprocess.run(
+        ["systemctl", "--user", "-M", "{}@".format(user), "start", unit],
+        capture_output=True, text=True
     )
+    if res.returncode != 0:
+        return "failed: {}".format((res.stderr or res.stdout).strip())
 
     if mode != "setup":
         # Start CEC navigation daemon for YouTube
@@ -139,12 +151,15 @@ def launch_yt_app(mode="account"):
 
 
 def stop_yt_app():
-    global yt_app_process
-    if yt_app_process and yt_app_process.poll() is None:
-        yt_app_process.terminate()
-        yt_app_process = None
-        return "stopped"
-    return "not running"
+    user = session_user()
+    if not user:
+        return "no user session"
+    units = ["bazzzzite-yt-app@{}.service".format(m) for m in ("account", "guest", "setup")]
+    res = subprocess.run(
+        ["systemctl", "--user", "-M", "{}@".format(user), "stop"] + units,
+        capture_output=True, text=True
+    )
+    return "stopped" if res.returncode == 0 else "failed: {}".format((res.stderr or res.stdout).strip())
 
 
 async def websocket_handler(request):

@@ -1,0 +1,12 @@
+[Unit]
+Description=Configure display-manager autologin for the Bazzzzite TV session
+Before=display-manager.service
+After=systemd-user-sessions.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/bazzzzite-autologin-setup
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target

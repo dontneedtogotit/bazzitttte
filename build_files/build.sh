@@ -10,8 +10,13 @@ systemctl mask fprintd.service
 systemctl mask switcheroo-control.service
 systemctl mask geoclue.service
 
-systemctl enable bazzzzite-tv-shell.service
+# The TV shell is a display-manager session (see bazzzzite-tv.desktop), not a
+# system service: the compositor needs a real logind session for XDG_RUNTIME_DIR
+# and seat/DRM access, which a root service using runuser cannot provide.
+systemctl enable bazzzzite-autologin-setup.service
+systemctl enable bazzzzite-tv-bridge.service
 systemctl enable bazzzzite-cecd.service
+systemctl set-default graphical.target
 
 dnf5 install -y --skip-unavailable cage chromium mpv jellyfin retroarch dolphin-emu \
     libcec cec-utils ffmpeg yt-dlp lm_sensors smartmontools \
@@ -37,9 +42,6 @@ if [[ ! -f /usr/share/vosk-models/vosk-model-small-en-us-0.15/model.tar.gz ]]; t
     fi
 fi
 
-mkdir -p /home/user/.config/bazzzzite/youtube-tv || true
-mkdir -p /home/user/.config/bazzzzite/youtube-tv-guest || true
-
 # Extracted once to a stable system path (not inside a profile dir) so it survives
 # the guest profile being wiped before every launch, and loads via --load-extension
 # for both account and guest mode.
@@ -57,7 +59,8 @@ fi
 systemctl enable bazzzzite-rygel.service
 systemctl enable bazzzzite-update-check.timer
 
-chmod +x /usr/libexec/bazzzzite-start-tv
+chmod +x /usr/libexec/bazzzzite-tv-session
+chmod +x /usr/libexec/bazzzzite-autologin-setup
 chmod +x /usr/libexec/bazzzzite-tv-bridge
 chmod +x /usr/libexec/bazzzzite-cecd
 chmod +x /usr/libexec/bazzzzite-game-mode

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# bazzzzite-tv-session: the TV shell session, launched by the display manager.
+#
+# This runs as the logged-in user inside a real logind session, which is what
+# provides XDG_RUNTIME_DIR, the session D-Bus, and seat/DRM access. Launching
+# the compositor from a root system service via runuser cannot provide those,
+# which is why that approach failed to start Cage at all.
+set -euo pipefail
+
+exec /usr/bin/cage -s -- \
+    /usr/bin/chromium \
+        --kiosk --noerrdialogs --disable-infobars \
+        --disable-features=Translate \
+        --ozone-platform=wayland \
+        --enable-features=VaapiVideoDecoder \
+        --ignore-gpu-blocklist \
+        --enable-zero-copy \
+        --disable-pinch --disable-zoom \
+        --disable-session-crashed-bubble \
+        http://localhost:8080

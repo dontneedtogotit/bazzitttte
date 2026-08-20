@@ -5,11 +5,16 @@
 #   guest:   same as account but the profile is wiped before every launch
 #            (a real profile, not --incognito, so ad-blocking still works)
 #   setup:   one-time windowed sign-in flow for the account profile
+#
+# Runs inside the user's existing graphical session. With WAYLAND_DISPLAY set,
+# Cage uses its Wayland backend and nests itself fullscreen on top of the TV
+# shell, so exiting returns you to the shell underneath.
 set -euo pipefail
 
 MODE="${1:-account}"
-YT_PROFILE_DIR="/home/user/.config/bazzzzite/youtube-tv"
-YT_GUEST_DIR="/home/user/.config/bazzzzite/youtube-tv-guest"
+PROFILE_ROOT="${XDG_CONFIG_HOME:-${HOME}/.config}/bazzzzite"
+YT_PROFILE_DIR="${PROFILE_ROOT}/youtube-tv"
+YT_GUEST_DIR="${PROFILE_ROOT}/youtube-tv-guest"
 YT_MODS_EXT="/usr/share/bazzzzite/yt-mods"
 UBLOCK_EXT="/usr/share/bazzzzite/ublock-origin"
 
@@ -35,12 +40,6 @@ case "$MODE" in
         ;;
 esac
 
-USER_NAME=$(awk -F: '($3 >= 1000 && $3 < 60000) { print $1; exit }' /etc/passwd)
-USER_UID=$(id -u "$USER_NAME")
-export XDG_RUNTIME_DIR="/run/user/${USER_UID}"
-export DISPLAY=":0"
-export WAYLAND_DISPLAY="wayland-0"
-
 echo "Starting YouTube (${MODE} mode)..."
 
 EXT_DIRS=()
@@ -53,8 +52,7 @@ if [[ ${#EXT_DIRS[@]} -gt 0 ]]; then
     EXT_ARGS=(--load-extension="$(IFS=,; echo "${EXT_DIRS[*]}")")
 fi
 
-exec runuser -u "$USER_NAME" -- dbus-run-session -- \
-    /usr/bin/cage --br -s -- \
+exec /usr/bin/cage -s -- \
     /usr/bin/chromium \
         --user-data-dir="$PROFILE_DIR" \
         "${WINDOW_ARGS[@]}" \

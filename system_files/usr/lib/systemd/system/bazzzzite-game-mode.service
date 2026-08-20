@@ -1,6 +1,6 @@
 [Unit]
 Description=Bazzzzite Game Mode (performance governor + disable Cage)
-After=bazzzzite-tv-shell.service
+After=display-manager.service
 
 [Service]
 Type=oneshot
