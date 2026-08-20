@@ -175,6 +175,16 @@ class TVApp {
                     window.Cameras.loadCameras();
                 }
                 break;
+            case 'cam_motion':
+                if (window.Cameras) {
+                    window.Cameras.showPip(data.payload.name, true);
+                }
+                break;
+            case 'cam_hide':
+                if (window.Cameras) {
+                    window.Cameras.hidePip();
+                }
+                break;
         }
     }
 
@@ -299,9 +309,18 @@ class TVApp {
             case 'Enter':
                 this.activateFocused();
                 break;
+            case '0':
+                if (window.Cameras) {
+                    window.Cameras.hidePip();
+                }
+                break;
             case 'Escape':
             case 'back':
-                if (this.currentTab !== 'home') {
+                // A visible camera PiP is dismissed first, so Back doesn't
+                // also throw you out of whatever tab you were on.
+                if (window.Cameras && window.Cameras.pipCamera) {
+                    window.Cameras.hidePip();
+                } else if (this.currentTab !== 'home') {
                     this.switchTab('home');
                 }
                 break;

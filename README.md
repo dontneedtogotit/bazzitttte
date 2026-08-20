@@ -223,6 +223,62 @@ YouTube TV launches a dedicated fullscreen YouTube experience, similar to Samsun
 1. Exit YouTube (`ujust bazzzzite-yt-app-stop`)
 2. Launch the other mode (`ujust bazzzzite-yt-app` or `ujust bazzzzite-yt-app-guest`)
 
+## IP cameras (picture-in-picture + motion)
+
+Show a network camera in a corner of the TV, and pop it up automatically when
+something moves.
+
+The picture-in-picture is drawn **inside the TV shell**, not as a separate
+window. Cage is a single-window kiosk compositor, so a floating mpv overlay is
+not possible; the bridge transcodes the camera to MJPEG (Chromium cannot play
+RTSP directly) and the shell displays it.
+
+### Setup
+
+1. Add a camera from the **Cameras** tab, or edit `/etc/bazzzzite/cameras.conf`:
+
+   ```
+   frontdoor rtsp://user:pass@192.168.1.50:554/stream1
+   backyard  rtsp://192.168.1.51:554/live 12
+   ```
+
+   The optional third field is the motion threshold (higher = less sensitive,
+   default 10). The shipped file contains **commented examples only** — until
+   you add a real camera, nothing will appear.
+
+2. Not sure of the URL? `ujust bazzzzite-cam-scan` probes the LAN for cameras.
+
+3. Start motion watching:
+
+   ```bash
+   ujust bazzzzite-cam-watch frontdoor
+   ```
+
+### Behaviour
+
+- The PiP stays **hidden** until motion is detected, then slides into the
+  bottom-right with a **MOTION** badge and hides itself again after
+  `popup_seconds` (default 15).
+- `cooldown` (default 30s) stops a busy scene from re-triggering constantly.
+- Press **0**, or **Back/Escape**, to dismiss it immediately. Back dismisses the
+  PiP first and only then leaves the current tab.
+- Select a camera in the Cameras tab to pin it open (no auto-hide); select it
+  again to close.
+
+### Tuning
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `CAM_FPS` / `CAM_WIDTH` | 2 / 320 | Frames analysed for motion — low is fine and cheap |
+| `CAM_PIP_FPS` / `CAM_PIP_WIDTH` | 8 / 480 | The picture you actually watch |
+| `CAM_THRESHOLD` | 10 | Sensitivity; higher = less sensitive |
+| `CAM_POPUP_SECONDS` | 15 | How long the popup stays |
+| `CAM_COOLDOWN` | 30 | Minimum gap between popups |
+
+Motion analysis runs continuously per watched camera, so on the NUC's 2-core
+CPU keep an eye on load if you watch several at once — `CAM_HWACCEL=vaapi`
+offloads decoding to the GPU.
+
 ## DLNA / Casting
 
 Enable DLNA renderer to let your Samsung TV cast media to the NUC:

@@ -49,38 +49,44 @@ require_cam() {
     echo "$url"
 }
 
-pip_title() { echo "bazzzzite-cam-$1"; }
-
-start_pip() {
-    local name="$1" url="$2"
-    if pgrep -f "$(pip_title "$name")" >/dev/null 2>&1; then
-        echo "PiP for '$name' already showing."
-        return 0
-    fi
-    nohup mpv --no-terminal --profile=low-latency --rtsp-transport=tcp \
-        --hwdec=auto --ontop --no-border \
-        --geometry="$PIP_POS" --autofit="$PIP_SIZE" \
-        --title="$(pip_title "$name")" "$url" >/dev/null 2>&1 &
-    echo "PiP for '$name' shown (bottom-right corner)."
+# Ask the TV shell to pop its in-UI PiP up for a camera. Cage is a
+# single-window kiosk compositor with no floating windows, so an mpv overlay
+# cannot work here -- the picture-in-picture lives inside the shell instead.
+notify_shell() {
+    local name="$1"
+    local token=""
+    [[ -r /etc/bazzzzite/ws-token ]] && token="$(cat /etc/bazzzzite/ws-token)"
+    local payload
+    payload=$(name="$name" token="$token" python3 -c \
+        'import json,os; print(json.dumps({"name": os.environ["name"], "token": os.environ["token"]}))')
+    curl -fsS -m 5 -X POST http://localhost:8080/cam/motion \
+        -H 'Content-Type: application/json' -d "$payload" >/dev/null 2>&1
 }
 
-stop_pip() {
+hide_pip() {
+    local token=""
+    [[ -r /etc/bazzzzite/ws-token ]] && token="$(cat /etc/bazzzzite/ws-token)"
+    local payload
+    payload=$(token="$token" python3 -c \
+        'import json,os; print(json.dumps({"token": os.environ["token"]}))')
+    curl -fsS -m 5 -X POST http://localhost:8080/cam/hide \
+        -H 'Content-Type: application/json' -d "$payload" >/dev/null 2>&1
+}
+
+start_pip() {
     local name="$1"
-    pkill -f "$(pip_title "$name")" 2>/dev/null || true
+    if notify_shell "$name"; then
+        echo "PiP for '$name' shown in the TV shell."
+    else
+        echo "Could not reach the TV shell on localhost:8080." >&2
+        return 1
+    fi
 }
 
 motion_popup() {
-    local name="$1" url="$2"
-    if command -v notify-send >/dev/null 2>&1; then
-        notify-send -a bazzzzite -u critical "Camera: ${name}" "Motion detected" 2>/dev/null || true
-    fi
-    if ! pgrep -f "$(pip_title "$name")" >/dev/null 2>&1; then
-        nohup mpv --no-terminal --profile=low-latency --rtsp-transport=tcp \
-            --hwdec=auto --ontop --no-border \
-            --geometry="$PIP_POS" --autofit="$PIP_SIZE" \
-            --title="$(pip_title "$name")" "$url" >/dev/null 2>&1 &
-        ( sleep "$POPUP_SECONDS"; stop_pip "$name" ) >/dev/null 2>&1 &
-    fi
+    local name="$1"
+    notify_shell "$name" \
+        || echo "[bazzzzite-cam] could not reach the TV shell to show '$name'" >&2
 }
 
 process_frames() {
@@ -155,15 +161,11 @@ list)
     ;;
 pip)
     [[ $# -ge 2 ]] || die "usage: bazzzzite-cam pip <name>"
-    url="$(require_cam "$2")"
-    start_pip "$2" "$url"
+    require_cam "$2" >/dev/null
+    start_pip "$2"
     ;;
 stop)
-    if [[ $# -ge 2 ]]; then
-        stop_pip "$2"
-    else
-        pkill -f "bazzzzite-cam-" 2>/dev/null || true
-    fi
+    hide_pip || die "could not reach the TV shell on localhost:8080"
     echo "PiP hidden."
     ;;
 watch)

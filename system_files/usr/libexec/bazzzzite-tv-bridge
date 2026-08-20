@@ -534,8 +534,6 @@ async def http_handler(request):
     path = request.path
     if path == "/" or path == "/index.html":
         path = "/index.html"
-    if path == "/token":
-        return web.json_response({"token": AUTH_TOKEN or ""})
     file_path = SHELL_DIR / path.lstrip("/")
     if not file_path.exists() or not file_path.is_file():
         return web.Response(status=404, text="Not found")
@@ -552,11 +550,115 @@ async def websocket_endpoint(request):
     return await websocket_handler(request)
 
 
+CAMERAS_CONF = Path("/etc/bazzzzite/cameras.conf")
+
+
+def camera_url(name):
+    """Look up a camera's stream URL in cameras.conf."""
+    if not name or not CAMERAS_CONF.exists():
+        return None
+    for line in CAMERAS_CONF.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) >= 2 and parts[0] == name:
+            return parts[1]
+    return None
+
+
+async def token_handler(request):
+    return web.json_response({"token": AUTH_TOKEN or ""})
+
+
+async def cam_stream_handler(request):
+    """Transcode a camera to MJPEG so the shell can show it in an <img>.
+
+    Chromium cannot play RTSP directly, so the PiP in the UI is fed from here.
+    """
+    name = request.match_info.get("name", "")
+    url = camera_url(name)
+    if not url:
+        return web.Response(status=404, text="unknown camera")
+
+    # Deliberately separate from CAM_FPS/CAM_WIDTH: those tune motion analysis
+    # (2fps at 320px is plenty for that) and would look choppy to watch.
+    fps = os.environ.get("CAM_PIP_FPS", "8")
+    width = os.environ.get("CAM_PIP_WIDTH", "480")
+    cmd = [
+        "ffmpeg", "-hide_banner", "-loglevel", "error",
+        "-rtsp_transport", "tcp", "-i", url,
+        "-vf", "fps={},scale={}:-2".format(fps, width),
+        "-q:v", "7",
+        "-f", "mpjpeg", "-boundary_tag", "bzcam", "-",
+    ]
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
+    )
+    resp = web.StreamResponse(
+        status=200,
+        headers={
+            "Content-Type": "multipart/x-mixed-replace; boundary=bzcam",
+            "Cache-Control": "no-store",
+        },
+    )
+    await resp.prepare(request)
+    try:
+        while True:
+            chunk = await proc.stdout.read(65536)
+            if not chunk:
+                break
+            await resp.write(chunk)
+    except (ConnectionResetError, asyncio.CancelledError):
+        pass
+    finally:
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+        await proc.wait()
+    return resp
+
+
+async def cam_motion_handler(request):
+    """Motion watchers post here; the shell is told to pop the PiP up."""
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad request"}, status=400)
+    if AUTH_TOKEN and data.get("token") != AUTH_TOKEN:
+        return web.json_response({"error": "unauthorized"}, status=403)
+    name = data.get("name", "")
+    if not camera_url(name):
+        return web.json_response({"error": "unknown camera"}, status=404)
+    await broadcast({"action": "cam_motion", "payload": {"name": name}})
+    return web.json_response({"ok": True})
+
+
+async def cam_hide_handler(request):
+    """Hide the shell's PiP."""
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad request"}, status=400)
+    if AUTH_TOKEN and data.get("token") != AUTH_TOKEN:
+        return web.json_response({"error": "unauthorized"}, status=403)
+    await broadcast({"action": "cam_hide", "payload": {}})
+    return web.json_response({"ok": True})
+
+
 def create_app():
     app = web.Application()
+    # Specific routes must be registered before the catch-all: aiohttp resolves
+    # in registration order, so a leading "/{path:.*}" would swallow /ws.
+    app.router.add_get("/ws", websocket_endpoint)
+    app.router.add_get("/token", token_handler)
+    app.router.add_get("/cam/{name}/stream.mjpg", cam_stream_handler)
+    app.router.add_post("/cam/motion", cam_motion_handler)
+    app.router.add_post("/cam/hide", cam_hide_handler)
     app.router.add_get("/", http_handler)
     app.router.add_get("/{path:.*}", http_handler)
-    app.router.add_get("/ws", websocket_endpoint)
     return app
 
 

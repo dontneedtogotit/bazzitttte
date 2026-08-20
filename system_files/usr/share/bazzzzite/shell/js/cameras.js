@@ -189,20 +189,14 @@ const Cameras = {
         setTimeout(() => this.loadCameras(), 500);
     },
 
+    // Showing the PiP is now purely a shell-side concern -- no round trip to
+    // the backend is needed to put the stream on screen.
     async pip(name) {
-        if (!window.tvApp?.ws) return;
-        window.tvApp.ws.send(JSON.stringify({
-            action: 'cam_pip',
-            payload: { name }
-        }));
+        this.togglePip(name);
     },
 
     async stop(name = '') {
-        if (!window.tvApp?.ws) return;
-        window.tvApp.ws.send(JSON.stringify({
-            action: 'cam_stop',
-            payload: { name }
-        }));
+        this.hidePip();
     },
 
     async stopAll() {
@@ -246,6 +240,65 @@ const Cameras = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+
+    // --- Picture-in-picture -------------------------------------------
+    // The PiP is part of the shell rather than a separate window: Cage shows
+    // one fullscreen window at a time, so a floating mpv overlay is not
+    // possible. The stream is MJPEG transcoded by the bridge, since Chromium
+    // cannot play RTSP directly.
+    pipTimer: null,
+    pipCamera: null,
+
+    showPip(name, motion = false) {
+        if (!name) return;
+        const box = document.getElementById('cam-pip');
+        const img = document.getElementById('cam-pip-img');
+        const title = document.getElementById('cam-pip-title');
+        const badge = document.getElementById('cam-pip-badge');
+        if (!box || !img) return;
+
+        // Only re-attach the stream when the camera actually changes, so a
+        // repeated motion event doesn't restart ffmpeg and stutter the feed.
+        if (this.pipCamera !== name) {
+            this.pipCamera = name;
+            img.src = `/cam/${encodeURIComponent(name)}/stream.mjpg?t=${Date.now()}`;
+        }
+        if (title) title.textContent = name;
+        if (badge) badge.classList.toggle('hidden', !motion);
+
+        box.classList.remove('hidden');
+
+        if (this.pipTimer) {
+            clearTimeout(this.pipTimer);
+            this.pipTimer = null;
+        }
+        if (motion) {
+            const secs = parseInt(this.settings.popup_seconds, 10) || 15;
+            this.pipTimer = setTimeout(() => this.hidePip(), secs * 1000);
+        }
+    },
+
+    hidePip() {
+        const box = document.getElementById('cam-pip');
+        const img = document.getElementById('cam-pip-img');
+        if (this.pipTimer) {
+            clearTimeout(this.pipTimer);
+            this.pipTimer = null;
+        }
+        this.pipCamera = null;
+        if (box) box.classList.add('hidden');
+        // Drop the connection so the bridge can stop its ffmpeg process.
+        if (img) img.src = '';
+    },
+
+    togglePip(name) {
+        const box = document.getElementById('cam-pip');
+        if (box && !box.classList.contains('hidden') && this.pipCamera === name) {
+            this.hidePip();
+        } else {
+            this.showPip(name, false);
+        }
     }
 };
 

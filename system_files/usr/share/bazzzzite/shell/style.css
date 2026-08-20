@@ -665,3 +665,69 @@ main#content {
     padding: 20px;
     color: var(--text-secondary);
 }
+
+/* --- Camera picture-in-picture ---------------------------------------- */
+/* Lives inside the shell because Cage is a single-window kiosk compositor
+   and cannot float a separate mpv window over the UI. */
+.cam-pip {
+    position: fixed;
+    right: 2vw;
+    bottom: 2vw;
+    width: 26vw;
+    max-width: 520px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+    z-index: 900;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.cam-pip.hidden {
+    display: none;
+}
+
+.cam-pip.entering {
+    opacity: 0;
+    transform: translateY(12px);
+}
+
+.cam-pip-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding: 0.4em 0.7em;
+    background: var(--bg-hover);
+    font-size: calc(0.9rem * var(--scale));
+    color: var(--text-primary);
+}
+
+.cam-pip-badge {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 3px;
+    padding: 0.1em 0.5em;
+    font-size: 0.8em;
+    letter-spacing: 0.05em;
+}
+
+.cam-pip-badge.hidden {
+    display: none;
+}
+
+.cam-pip img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #000;
+}
+
+.cam-pip-hint {
+    padding: 0.3em 0.7em;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    font-size: calc(0.75rem * var(--scale));
+    text-align: right;
+}
