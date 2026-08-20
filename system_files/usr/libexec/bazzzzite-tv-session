@@ -7,14 +7,4 @@
 # which is why that approach failed to start Cage at all.
 set -euo pipefail
 
-exec /usr/bin/cage -s -- \
-    /usr/bin/chromium \
-        --kiosk --noerrdialogs --disable-infobars \
-        --disable-features=Translate \
-        --ozone-platform=wayland \
-        --enable-features=VaapiVideoDecoder \
-        --ignore-gpu-blocklist \
-        --enable-zero-copy \
-        --disable-pinch --disable-zoom \
-        --disable-session-crashed-bubble \
-        http://localhost:8080
+exec /usr/bin/cage -s -- /usr/libexec/bazzzzite-tv-shell-inner

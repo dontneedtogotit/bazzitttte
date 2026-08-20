@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# bazzzzite-tv-shell-inner: runs as Cage's child, so WAYLAND_DISPLAY is set.
+#
+# Cage is a bare compositor and does not run the usual session startup that
+# publishes the display to the systemd user manager. Without this, user units
+# launched later (the YouTube app) inherit no WAYLAND_DISPLAY, fall back to the
+# DRM backend, and fail because this session already holds the display.
+set -euo pipefail
+
+systemctl --user import-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR 2>/dev/null || true
+dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_RUNTIME_DIR 2>/dev/null || true
+systemctl --user start graphical-session.target 2>/dev/null || true
+
+exec /usr/bin/chromium \
+    --kiosk --noerrdialogs --disable-infobars \
+    --disable-features=Translate \
+    --ozone-platform=wayland \
+    --enable-features=VaapiVideoDecoder \
+    --ignore-gpu-blocklist \
+    --enable-zero-copy \
+    --disable-pinch --disable-zoom \
+    --disable-session-crashed-bubble \
+    http://localhost:8080

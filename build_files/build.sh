@@ -18,10 +18,20 @@ systemctl enable bazzzzite-tv-bridge.service
 systemctl enable bazzzzite-cecd.service
 systemctl set-default graphical.target
 
-dnf5 install -y --skip-unavailable cage chromium mpv jellyfin retroarch dolphin-emu \
-    libcec cec-utils ffmpeg yt-dlp lm_sensors smartmontools \
-    gamemode igt-gpu-tools python3-pip python3-gobject python3-dbus \
-    python3-websockets python3-aiohttp python3-vosk qt6-qtbase qt6-qtwayland qt6-qtsvg \
+# Without these there is no TV at all, so a missing one must fail the build
+# rather than silently produce an image that boots to nothing. `jellyfin`,
+# `cec-utils` and `python3-vosk` used to sit in this list behind
+# --skip-unavailable and were being dropped on every build without a trace:
+# Jellyfin ships as the jellyfin.container quadlet instead, and cec-client
+# comes from libcec.
+dnf5 install -y cage chromium mpv libcec ffmpeg yt-dlp \
+    python3-websockets python3-aiohttp
+
+# Nice-to-haves: the TV still works without any of them, so tolerate absence.
+dnf5 install -y --skip-unavailable retroarch dolphin-emu \
+    lm_sensors smartmontools gamemode igt-gpu-tools \
+    python3-pip python3-gobject python3-dbus \
+    qt6-qtbase qt6-qtwayland qt6-qtsvg \
     rygel edid-decode firewalld nmap xdotool wmctrl
 
 if command -v firewall-offline-cmd >/dev/null; then
@@ -29,8 +39,6 @@ if command -v firewall-offline-cmd >/dev/null; then
     firewall-offline-cmd --add-service=dhcp
     firewall-offline-cmd --add-service=dns
 fi
-
-systemctl enable jellyfin.service || true
 
 if [[ ! -f /usr/share/vosk-models/vosk-model-small-en-us-0.15/model.tar.gz ]]; then
     echo "Downloading Vosk voice model..."
@@ -60,6 +68,7 @@ systemctl enable bazzzzite-rygel.service
 systemctl enable bazzzzite-update-check.timer
 
 chmod +x /usr/libexec/bazzzzite-tv-session
+chmod +x /usr/libexec/bazzzzite-tv-shell-inner
 chmod +x /usr/libexec/bazzzzite-autologin-setup
 chmod +x /usr/libexec/bazzzzite-tv-bridge
 chmod +x /usr/libexec/bazzzzite-cecd
