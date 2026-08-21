@@ -11,7 +11,15 @@ systemctl --user import-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR 2>/dev/null 
 dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_RUNTIME_DIR 2>/dev/null || true
 systemctl --user start graphical-session.target 2>/dev/null || true
 
+# Keep the HTTP cache in the runtime directory, which is tmpfs and therefore
+# empty after every boot. The shell is served from loopback, so a persistent
+# cache saves nothing -- but it did survive image updates and keep showing the
+# old interface, which looked exactly like the update having failed.
+CACHE_DIR="${XDG_RUNTIME_DIR:-/tmp}/bazzzzite-shell-cache"
+rm -rf "$CACHE_DIR"
+
 exec /usr/bin/chromium \
+    --disk-cache-dir="$CACHE_DIR" \
     --kiosk --noerrdialogs --disable-infobars \
     --disable-features=Translate \
     --ozone-platform=wayland \

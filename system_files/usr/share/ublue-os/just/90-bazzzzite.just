@@ -171,12 +171,24 @@ bazzzzite-update:
     #!/usr/bin/bash
     set -eou pipefail
     echo "== Downloading OS update =="
-    sudo bootc upgrade
+    if ! sudo bootc upgrade; then
+        echo
+        echo "OS update FAILED. Nothing has been staged; the current system is untouched."
+        echo "Run 'ujust bazzzzite-doctor' for details."
+        exit 1
+    fi
     echo
     echo "== Updating Flatpaks =="
     flatpak update -y 2>/dev/null || true
     echo
-    echo "Update staged. Reboot to apply."
+    echo "== Clearing the interface cache =="
+    rm -rf ~/.cache/chromium
+    echo
+    if sudo bootc status --format=json 2>/dev/null | grep -q '"staged"[^,]*{'; then
+        echo "Update staged. Reboot to apply:  sudo reboot"
+    else
+        echo "Already up to date; nothing to reboot for."
+    fi
 
 [group('Bazzzzite TV')]
 bazzzzite-rollback:
