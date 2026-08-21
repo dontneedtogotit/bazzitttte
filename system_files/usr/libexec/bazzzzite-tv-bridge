@@ -538,7 +538,15 @@ async def http_handler(request):
         ".svg": "image/svg+xml",
     }
     ext = file_path.suffix
-    return web.FileResponse(file_path, headers={"Content-Type": content_types.get(ext, "application/octet-stream")})
+    return web.FileResponse(file_path, headers={
+        "Content-Type": content_types.get(ext, "application/octet-stream"),
+        # Without this the browser applies heuristic freshness (roughly 10% of
+        # the file's age) and serves the shell from its own cache for days
+        # without asking. That cache lives in the user's home, which survives a
+        # bootc upgrade, so an updated image would keep showing the old UI.
+        # Revalidation is free over loopback.
+        "Cache-Control": "no-cache, must-revalidate",
+    })
 
 
 async def websocket_endpoint(request):
