@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# bazzzzite-doctor: one-shot health report for the TV.
+#
+# Prints what is actually true on this machine -- which image is booted, where
+# the shell is being served from, whether each service is alive -- so a problem
+# can be pinned down without running a dozen commands by hand.
+set -uo pipefail
+
+GREEN=$'\e[32m'; RED=$'\e[31m'; YELLOW=$'\e[33m'; DIM=$'\e[2m'; OFF=$'\e[0m'
+pass() { echo "  ${GREEN}ok${OFF}    $1"; }
+fail() { echo "  ${RED}FAIL${OFF}  $1"; }
+warn() { echo "  ${YELLOW}warn${OFF}  $1"; }
+note() { echo "        ${DIM}$1${OFF}"; }
+section() { echo; echo "== $1 =="; }
+
+section "OS image"
+if command -v bootc >/dev/null 2>&1; then
+    booted=$(bootc status --format=json 2>/dev/null \
+        | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get("status",{}).get("booted") or {}).get("image",{}).get("image",{}).get("image","?"))' 2>/dev/null)
+    digest=$(bootc status --format=json 2>/dev/null \
+        | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get("status",{}).get("booted") or {}).get("image",{}).get("imageDigest","?"))' 2>/dev/null)
+    staged=$(bootc status --format=json 2>/dev/null \
+        | python3 -c 'import json,sys; d=json.load(sys.stdin); print("yes" if (d.get("status",{}).get("staged")) else "no")' 2>/dev/null)
+    pass "booted image: ${booted:-unknown}"
+    note "digest: ${digest:-unknown}"
+    if [[ "$staged" == "yes" ]]; then
+        warn "an update is staged but NOT running -- reboot to apply it"
+    fi
+else
+    warn "bootc not available (not a bootc system?)"
+fi
+
+section "TV interface"
+BUILTIN=/usr/share/bazzzzite/shell
+OVERRIDE=/var/lib/bazzzzite/shell
+if [[ -f "$OVERRIDE/index.html" ]]; then
+    warn "serving the OVERRIDE in $OVERRIDE, not the image"
+    note "this wins over the image; 'bazzzzite-shell-update --reset' undoes it"
+    SERVED_DIR="$OVERRIDE"
+else
+    pass "serving the shell from the image"
+    SERVED_DIR="$BUILTIN"
+fi
+if [[ -f "$SERVED_DIR/index.html" ]]; then
+    note "on disk:  $(stat -c '%y' "$SERVED_DIR/index.html" | cut -d. -f1)"
+else
+    fail "no index.html in $SERVED_DIR"
+fi
+
+# What the browser would actually receive, which is the thing that matters.
+served=$(curl -fsS --max-time 5 http://localhost:8080/ 2>/dev/null)
+if [[ -n "$served" ]]; then
+    pass "bridge is serving the shell on :8080"
+    cache=$(curl -fsSI --max-time 5 http://localhost:8080/ 2>/dev/null | grep -i '^cache-control' | tr -d '\r')
+    if [[ -n "$cache" ]]; then
+        note "${cache}"
+    else
+        warn "no Cache-Control header -- the browser may show a stale UI"
+    fi
+    if grep -q 'id="fanart"' <<<"$served"; then
+        pass "Kodi-style shell is live (sidebar + fanart)"
+    else
+        fail "the served shell is the OLD layout"
+        note "if the image is current, clear the browser cache:"
+        note "  rm -rf ~/.cache/chromium && sudo systemctl restart display-manager"
+    fi
+    if grep -q 'data-tab="cameras"' <<<"$served"; then
+        pass "Cameras tab present"
+    else
+        fail "no Cameras tab in the served shell"
+    fi
+else
+    fail "nothing answering on http://localhost:8080 (is bazzzzite-tv-bridge running?)"
+fi
+
+section "Services"
+for unit in bazzzzite-tv-bridge bazzzzite-cecd bazzzzite-ydotoold display-manager; do
+    state=$(systemctl is-active "$unit" 2>/dev/null)
+    if [[ "$state" == "active" ]]; then
+        pass "$unit"
+    else
+        fail "$unit is ${state:-missing}"
+        note "journalctl -u $unit -b | tail -20"
+    fi
+done
+
+section "Remote (HDMI-CEC)"
+if [[ -e /dev/cec0 ]]; then
+    pass "/dev/cec0 present"
+else
+    warn "no /dev/cec0 -- the NUC may not expose a CEC adapter"
+    note "an external USB-CEC adapter shows up as /dev/ttyACM0 instead"
+fi
+if command -v cec-client >/dev/null 2>&1; then
+    pass "cec-client installed"
+    if cec-client -l 2>/dev/null | grep -qi 'device number\|com port'; then
+        pass "a CEC adapter was detected"
+    else
+        fail "cec-client sees no adapter -- the remote cannot work"
+    fi
+else
+    fail "cec-client missing (expected from the libcec package)"
+fi
+if journalctl -u bazzzzite-cecd -b --no-pager 2>/dev/null | grep -q "Connected to TV bridge"; then
+    pass "CEC daemon authenticated to the bridge"
+elif journalctl -u bazzzzite-cecd -b --no-pager 2>/dev/null | grep -q "rejected auth"; then
+    fail "the bridge rejected the CEC daemon's token"
+else
+    warn "no CEC daemon connection logged yet this boot"
+fi
+
+section "Apps"
+if flatpak info rocks.shy.VacuumTube >/dev/null 2>&1; then
+    pass "VacuumTube (YouTube) installed"
+else
+    fail "VacuumTube not installed -- run: ujust bazzzzite-install-flatpaks"
+fi
+if systemctl is-active jellyfin.service >/dev/null 2>&1; then
+    pass "Jellyfin running"
+else
+    warn "Jellyfin not running"
+fi
+
+section "Cameras"
+CONF=/etc/bazzzzite/cameras.conf
+if [[ -f "$CONF" ]] && awk '$1 !~ /^#/ && NF>=2' "$CONF" | grep -q .; then
+    n=$(awk '$1 !~ /^#/ && NF>=2' "$CONF" | wc -l)
+    pass "${n} camera(s) configured"
+    awk '$1 !~ /^#/ && NF>=2 {printf "        %s\n", $1}' "$CONF"
+else
+    warn "no cameras configured yet (the shipped file is examples only)"
+    note "add one in the Cameras tab, or edit $CONF"
+fi
+
+echo
+echo "Report finished. Paste this whole output if you need help with it."

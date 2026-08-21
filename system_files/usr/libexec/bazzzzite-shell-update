@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# bazzzzite-shell-update: refresh the TV interface without rebuilding the image.
+#
+# The shell is plain HTML/CSS/JS served by the bridge, so it does not need to
+# ride along with an OS image build. This pulls the current version straight
+# from the repo into /var/lib/bazzzzite/shell, which the bridge prefers over
+# the copy in read-only /usr. Takes effect on the next page load.
+#
+#   bazzzzite-shell-update            # latest from the default branch
+#   bazzzzite-shell-update some-branch
+#   bazzzzite-shell-update --reset    # go back to the version in the image
+set -euo pipefail
+
+REPO="${BAZZZZITE_REPO:-dontneedtogotit/bazzitttte}"
+OVERRIDE="/var/lib/bazzzzite/shell"
+REF="${1:-main}"
+
+die() { echo "bazzzzite-shell-update: $*" >&2; exit 1; }
+
+if [[ "$REF" == "--reset" ]]; then
+    rm -rf "${OVERRIDE:?}"
+    echo "Override removed; the bridge is serving the shell from the image again."
+    echo "Reload the TV shell:  sudo systemctl restart display-manager"
+    exit 0
+fi
+
+command -v curl >/dev/null || die "curl is required"
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+echo "Fetching ${REPO}@${REF}..."
+curl -fsSL "https://codeload.github.com/${REPO}/tar.gz/refs/heads/${REF}" \
+    -o "$TMP/src.tar.gz" || die "download failed (is '${REF}' a real branch?)"
+
+tar -xzf "$TMP/src.tar.gz" -C "$TMP" || die "could not unpack the download"
+
+SRC="$(find "$TMP" -type d -path '*/system_files/usr/share/bazzzzite/shell' | head -1)"
+[[ -n "$SRC" && -f "$SRC/index.html" ]] || die "no shell directory in that download"
+
+# Stage then swap, so a failed copy cannot leave a half-written UI in place.
+STAGE="${OVERRIDE}.new"
+rm -rf "$STAGE"
+mkdir -p "$(dirname "$OVERRIDE")"
+cp -a "$SRC" "$STAGE"
+rm -rf "${OVERRIDE:?}"
+mv "$STAGE" "$OVERRIDE"
+
+echo "TV interface updated from ${REPO}@${REF}."
+echo "Reload it with:  sudo systemctl restart display-manager"

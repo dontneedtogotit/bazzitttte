@@ -138,6 +138,10 @@ Enable in Settings > Features > Voice, then say:
 ## ujust recipes
 
 ```bash
+ujust bazzzzite-doctor          # Full health report -- run this first when something's wrong
+ujust bazzzzite-refresh-ui      # Clear the browser cache and reload the shell
+ujust bazzzzite-shell-update    # Update the interface from git, no image build
+ujust bazzzzite-shell-reset     # Go back to the interface shipped in the image
 ujust bazzzzite-status          # Show status of all services
 ujust bazzzzite-restart-shell   # Restart the TV shell
 ujust bazzzzite-test-cec        # Test HDMI-CEC remote
@@ -330,6 +334,45 @@ If your TV displays at the wrong resolution or has overscan:
 ujust bazzzzite-edid
 ```
 This reads the TV's EDID and saves the optimal mode to `/etc/bazzzzite/edid-mode`. Reboot to apply.
+
+## Troubleshooting
+
+**Start here:**
+
+```bash
+ujust bazzzzite-doctor
+```
+
+It reports the booted image and digest, whether an update is staged but not
+yet rebooted into, where the shell is being served from, whether what the
+browser receives is the current UI, the state of every service, whether the
+CEC adapter is visible, and what is installed. Paste the whole thing when
+asking for help.
+
+### The interface looks unchanged after an update
+
+The browser caches the shell in `~/.cache/chromium`, which lives in your home
+directory and therefore survives an image update. If `bazzzzite-doctor` says
+the image is current but the served shell is the old layout:
+
+```bash
+ujust bazzzzite-refresh-ui
+```
+
+### Changing the interface without waiting for a build
+
+The shell is plain HTML/CSS/JS, so it does not need an image build:
+
+```bash
+ujust bazzzzite-shell-update        # pull the current UI from the repo
+ujust bazzzzite-shell-update mybranch
+ujust bazzzzite-shell-reset        # drop the override, use the image's copy
+```
+
+The override lives in `/var/lib/bazzzzite/shell` and is resolved per file, so
+anything it does not contain still comes from the image. For editing directly
+on the TV, `sudo bootc usr-overlay` makes `/usr` writable until the next
+reboot.
 
 ## Development
 

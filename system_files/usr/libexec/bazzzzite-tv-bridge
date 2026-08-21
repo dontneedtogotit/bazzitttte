@@ -23,7 +23,35 @@ import sys
 from pathlib import Path
 from aiohttp import web, WSMsgType
 
-SHELL_DIR = Path("/usr/share/bazzzzite/shell")
+# The shell ships in the image, but /usr is read-only on bootc. An override in
+# /var lets the UI be updated without rebuilding and rebooting; it is resolved
+# per request, so a refresh takes effect immediately.
+SHELL_BUILTIN = Path("/usr/share/bazzzzite/shell")
+SHELL_OVERRIDE = Path("/var/lib/bazzzzite/shell")
+# Data the shell reads but recipes write, which likewise cannot live in /usr.
+DATA_DIR = Path("/var/lib/bazzzzite/data")
+
+
+def resolve_asset(rel):
+    """First match wins: generated data, then any override, then the image.
+
+    Resolution is per file rather than per directory so a partial override
+    cannot hide the rest of the shell.
+    """
+    for root in (DATA_DIR, SHELL_OVERRIDE, SHELL_BUILTIN):
+        candidate = (root / rel)
+        try:
+            resolved = candidate.resolve()
+            # Keep "../" in a request from escaping the asset directories.
+            if not str(resolved).startswith(str(root.resolve()) + "/"):
+                continue
+        except (OSError, RuntimeError):
+            continue
+        if resolved.is_file():
+            return resolved
+    return None
+
+
 MPV_SOCK = "/tmp/mpv.sock"
 PORT = 8080
 SETTINGS_FILE = Path("/etc/bazzzzite/settings.json")
@@ -529,8 +557,8 @@ async def http_handler(request):
     path = request.path
     if path == "/" or path == "/index.html":
         path = "/index.html"
-    file_path = SHELL_DIR / path.lstrip("/")
-    if not file_path.exists() or not file_path.is_file():
+    file_path = resolve_asset(path.lstrip("/"))
+    if file_path is None:
         return web.Response(status=404, text="Not found")
     content_types = {
         ".html": "text/html", ".css": "text/css", ".js": "application/javascript",

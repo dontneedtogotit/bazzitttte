@@ -101,8 +101,8 @@ bazzzzite-iptv-update:
     fi
     url=$(sudo cat /etc/bazzzzite/iptv-url)
     echo "Fetching IPTV channels from $url..."
-    mkdir -p /usr/share/bazzzzite/shell/iptv
-    curl -s "$url" | python3 -c "
+    sudo mkdir -p /var/lib/bazzzzite/data/iptv
+    curl -s "$url" | sudo python3 -c "
         import sys, json, re
         channels = []
         name = ''
@@ -119,7 +119,7 @@ bazzzzite-iptv-update:
                 url = line
                 channels.append({'name': name, 'logo': logo, 'url': url})
                 name = logo = url = ''
-        with open('/usr/share/bazzzzite/shell/iptv/channels.json', 'w') as f:
+        with open('/var/lib/bazzzzite/data/iptv/channels.json', 'w') as f:
             json.dump(channels, f)
         print(f'Loaded {len(channels)} channels')
     " || echo "Failed to parse m3u"
@@ -259,3 +259,29 @@ bazzzzite-install-flatpaks:
     set -eou pipefail
     sudo systemctl start bazzzzite-flatpaks.service
     systemctl status bazzzzite-flatpaks.service --no-pager || true
+
+[group('Bazzzzite TV')]
+bazzzzite-doctor:
+    #!/usr/bin/bash
+    set -eou pipefail
+    /usr/libexec/bazzzzite-doctor
+
+[group('Bazzzzite TV')]
+bazzzzite-shell-update ref="main":
+    #!/usr/bin/bash
+    set -eou pipefail
+    sudo /usr/libexec/bazzzzite-shell-update "{{ ref }}"
+
+[group('Bazzzzite TV')]
+bazzzzite-shell-reset:
+    #!/usr/bin/bash
+    set -eou pipefail
+    sudo /usr/libexec/bazzzzite-shell-update --reset
+
+[group('Bazzzzite TV')]
+bazzzzite-refresh-ui:
+    #!/usr/bin/bash
+    set -eou pipefail
+    echo "Clearing the browser cache and reloading the TV shell..."
+    rm -rf ~/.cache/chromium
+    sudo systemctl restart display-manager

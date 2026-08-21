@@ -69,6 +69,8 @@ chmod +x /usr/libexec/bazzzzite-update-check
 chmod +x /usr/libexec/bazzzzite-cam
 chmod +x /usr/libexec/bazzzzite-youtube
 chmod +x /usr/libexec/bazzzzite-install-flatpaks
+chmod +x /usr/libexec/bazzzzite-doctor
+chmod +x /usr/libexec/bazzzzite-shell-update
 mkdir -p /mnt/media || true
 mkdir -p /etc/bazzzzite || true
 mkdir -p /usr/share/vosk-models || true
