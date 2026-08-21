@@ -18,6 +18,7 @@ Serves the TV shell UI and bridges between the browser and backend services:
 import asyncio
 import json
 import os
+import pwd
 import subprocess
 import sys
 from pathlib import Path
@@ -103,10 +104,17 @@ settings = load_settings()
 profiles = load_profiles()
 
 
-async def broadcast(data):
+async def broadcast(data, exclude=None):
+    """Send to every connected client, optionally skipping the originator.
+
+    The CEC daemon never reads its own socket, so echoing its events back at
+    it would fill a queue nobody drains.
+    """
     if not ws_clients:
         return
     for ws in list(ws_clients):
+        if ws is exclude:
+            continue
         try:
             await ws.send_json(data)
         except Exception:
@@ -148,11 +156,47 @@ def stop_mpv():
 
 def session_user():
     """First regular account — the one the display manager auto-logs in."""
-    import pwd
     for entry in pwd.getpwall():
         if 1000 <= entry.pw_uid < 60000:
-            return entry.pw_name
+            return entry
     return None
+
+
+VOICE_VOLUME_ACTIONS = {
+    "volume_up": "up",
+    "volume_down": "down",
+    "volume_mute": "mute",
+}
+
+# wpctl's own argument order: options, then the target, then the amount.
+VOLUME_ARGS = {
+    "up": ["set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", "5%+"],
+    "down": ["set-volume", "@DEFAULT_AUDIO_SINK@", "5%-"],
+    "mute": ["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"],
+}
+
+
+def set_volume(direction):
+    """Adjust the default sink.
+
+    Audio lives in the logged-in user's PipeWire instance, which this root
+    service can only reach by entering that session's runtime directory.
+    """
+    args = VOLUME_ARGS.get(direction)
+    if args is None:
+        return "unknown direction"
+    user = session_user()
+    if user is None:
+        return "no user session"
+    res = subprocess.run(
+        ["runuser", "-u", user.pw_name, "--",
+         "env", "XDG_RUNTIME_DIR=/run/user/{}".format(user.pw_uid),
+         "wpctl", *args],
+        capture_output=True, text=True, timeout=5,
+    )
+    if res.returncode != 0:
+        return "failed: {}".format((res.stderr or res.stdout).strip())
+    return "ok"
 
 
 def launch_youtube():
@@ -164,7 +208,7 @@ def launch_youtube():
     if not user:
         return "no user session"
     res = subprocess.run(
-        ["systemctl", "--user", "-M", "{}@".format(user), "start",
+        ["systemctl", "--user", "-M", "{}@".format(user.pw_name), "start",
          "bazzzzite-youtube.service"],
         capture_output=True, text=True
     )
@@ -178,7 +222,7 @@ def stop_youtube():
     if not user:
         return "no user session"
     res = subprocess.run(
-        ["systemctl", "--user", "-M", "{}@".format(user), "stop",
+        ["systemctl", "--user", "-M", "{}@".format(user.pw_name), "stop",
          "bazzzzite-youtube.service"],
         capture_output=True, text=True
     )
@@ -222,7 +266,22 @@ async def handle_ws_message(ws, data):
     action = data.get("action")
     payload = data.get("payload", {})
 
-    if action == "mpv_play":
+    if action == "cec_event":
+        # The CEC daemon owns the device and forwards presses here; the shell
+        # is a web page and cannot receive them from the compositor any other
+        # way. Without this relay the remote reached nothing at all.
+        await broadcast({"action": "cec_event", "payload": payload}, exclude=ws)
+
+    elif action == "volume":
+        result = set_volume(payload.get("direction", ""))
+        await ws.send_json({"action": "volume", "payload": {"status": result}})
+
+    elif action in VOICE_VOLUME_ACTIONS:
+        # The voice daemon names the direction in the action itself.
+        result = set_volume(VOICE_VOLUME_ACTIONS[action])
+        await ws.send_json({"action": "volume", "payload": {"status": result}})
+
+    elif action == "mpv_play":
         url = payload.get("url", "")
         result = start_mpv(url)
         await ws.send_json({"action": "mpv_status", "payload": {"status": result}})

@@ -2,6 +2,19 @@
  * Bazzzzite TV Shell - Main Application
  */
 
+// The remote spells its navigation keys differently from a keyboard, and the
+// navigation switch only ever knew the keyboard's names -- so arrows and OK
+// from the remote fell through it and did nothing. Translating here keeps one
+// path for both. Media, back and home keys have no keyboard equivalent and are
+// handled under their own names.
+const CEC_KEYS = {
+    up: 'ArrowUp',
+    down: 'ArrowDown',
+    left: 'ArrowLeft',
+    right: 'ArrowRight',
+    enter: 'Enter',
+};
+
 class TVApp {
     constructor() {
         this.ws = null;
@@ -190,9 +203,8 @@ class TVApp {
     }
 
     handleCECEvent(payload) {
-        const key = payload.key;
-        const action = payload.action;
-        if (action === 'keydown') {
+        const key = CEC_KEYS[payload.key] || payload.key;
+        if (payload.action === 'keydown') {
             this.handleKeyDown(key);
         }
     }
@@ -285,6 +297,18 @@ class TVApp {
     }
 
     handleKeyDown(key) {
+        // A keyboard's media keys reach the page because nothing under Cage
+        // grabs them. Volume applies over an open overlay too, so it is
+        // handled before the overlay swallows the rest.
+        switch (key) {
+            case 'AudioVolumeUp':
+                return this.setVolume('up');
+            case 'AudioVolumeDown':
+                return this.setVolume('down');
+            case 'AudioVolumeMute':
+                return this.setVolume('mute');
+        }
+
         const overlay = document.querySelector('.overlay:not(.hidden)');
         if (overlay) {
             if (key === 'Escape' || key === 'back') {
@@ -534,6 +558,15 @@ class TVApp {
             this.ws.send(JSON.stringify({
                 action: 'mpv_play',
                 payload: { url: url, type: type }
+            }));
+        }
+    }
+
+    setVolume(direction) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({
+                action: 'volume',
+                payload: { direction: direction }
             }));
         }
     }

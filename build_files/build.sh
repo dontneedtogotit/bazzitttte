@@ -25,7 +25,7 @@ systemctl set-default graphical.target
 # Jellyfin ships as the jellyfin.container quadlet instead, and cec-client
 # comes from libcec.
 dnf5 install -y cage chromium mpv libcec ffmpeg yt-dlp ydotool \
-    python3-websockets python3-aiohttp
+    python3-websockets python3-aiohttp wireplumber
 
 # Nice-to-haves: the TV still works without any of them, so tolerate absence.
 dnf5 install -y --skip-unavailable retroarch dolphin-emu \

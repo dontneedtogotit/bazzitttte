@@ -1,35 +1,65 @@
 #!/usr/bin/env bash
-# bazzzzite-game-mode: switch to game mode (disable Cage, performance governor)
+# bazzzzite-game-mode: switch to game mode (stop the TV session, performance
+# governor).
 # Usage: bazzzzite-game-mode start|stop|status
 set -euo pipefail
 
-CAGE_PID=$(pgrep -f "cage --br" || true)
-GOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo "unknown")
+# The governor in use before game mode. /run is the right home for it: a reboot
+# resets the governor anyway, so a stale value must not survive one.
+GOVERNOR_SAVE="/run/bazzzzite-governor"
+
+cage_running() {
+    # Matched on the process name, not on the arguments: the old pattern was
+    # from a launcher that no longer exists, so it never matched and game mode
+    # believed the compositor was already gone.
+    pgrep -x cage >/dev/null
+}
+
+current_governor() {
+    cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo "unknown"
+}
+
+set_governor() {
+    for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+        echo "$1" > "$cpu/cpufreq/scaling_governor" 2>/dev/null || true
+    done
+}
 
 case "${1:-status}" in
     start)
-        if [[ -n "$CAGE_PID" ]]; then
-            echo "Stopping Cage (PID $CAGE_PID)..."
-            kill "$CAGE_PID" 2>/dev/null || true
-            sleep 1
+        # Killing Cage on its own does not hold: sddm autologin has
+        # Relogin=true, so the TV session comes straight back. Stopping the
+        # display manager takes the compositor with it and keeps it down.
+        if cage_running; then
+            echo "Stopping the TV session..."
+            systemctl stop display-manager.service 2>/dev/null || true
         fi
+        # Restore whatever was actually in use rather than a hardcoded name:
+        # intel_pstate on this NUC offers only performance and powersave, so
+        # putting back "schedutil" silently failed and left the CPU pinned to
+        # performance for good.
+        current_governor > "$GOVERNOR_SAVE"
         echo "Setting CPU governor to performance..."
-        for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
-            echo "performance" > "$cpu/cpufreq/scaling_governor" 2>/dev/null || true
-        done
+        set_governor performance
         echo "Game mode enabled. Launch your game now."
         ;;
     stop)
-        echo "Restoring CPU governor to schedutil..."
-        for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
-            echo "schedutil" > "$cpu/cpufreq/scaling_governor" 2>/dev/null || true
-        done
+        PREVIOUS=$(cat "$GOVERNOR_SAVE" 2>/dev/null || echo "")
+        if [[ -n "$PREVIOUS" && "$PREVIOUS" != "unknown" ]]; then
+            echo "Restoring CPU governor to ${PREVIOUS}..."
+            set_governor "$PREVIOUS"
+        fi
+        rm -f "$GOVERNOR_SAVE"
         echo "Restarting the TV session..."
-        systemctl restart display-manager.service 2>/dev/null || true
+        systemctl start display-manager.service 2>/dev/null || true
         echo "Game mode disabled. TV shell restored."
         ;;
     status)
-        echo "Cage running: $([[ -n "$CAGE_PID" ]] && echo yes || echo no)"
-        echo "CPU governor: $GOVERNOR"
+        if cage_running; then
+            echo "Cage running: yes"
+        else
+            echo "Cage running: no"
+        fi
+        echo "CPU governor: $(current_governor)"
         ;;
 esac

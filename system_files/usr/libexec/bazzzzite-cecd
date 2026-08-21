@@ -72,12 +72,14 @@ KEYCODES = {
     "next": 163,
     "previous": 165,
     "home": 172,
-    "mute": 113,
     "channel_up": 104,      # KEY_PAGEUP
     "channel_down": 109,    # KEY_PAGEDOWN
-    "volume_up": 115,
-    "volume_down": 114,
 }
+
+# Volume is the machine's, not the foreground app's: nothing under Cage grabs
+# the media keys, so injecting KEY_VOLUMEUP reached nobody. These go to the
+# bridge instead, whichever UI is in front.
+VOLUME_KEYS = {"volume_up": "up", "volume_down": "down", "mute": "mute"}
 
 
 def read_token():
@@ -162,6 +164,18 @@ async def connect_ws():
         await asyncio.sleep(2)
 
 
+async def send_ws(ws, message):
+    """Send to the bridge, reconnecting once if it went away."""
+    for attempt in (1, 2):
+        try:
+            await ws.send(json.dumps(message))
+            return ws
+        except Exception:
+            if attempt == 1:
+                ws = await connect_ws()
+    return ws
+
+
 async def cec_reader():
     proc = subprocess.Popen(
         ["cec-client", "-d", "1", "-t", "p"],
@@ -182,6 +196,14 @@ async def cec_reader():
         if not key:
             continue
 
+        if key in VOLUME_KEYS:
+            if action == "keydown":
+                ws = await send_ws(ws, {
+                    "action": "volume",
+                    "payload": {"direction": VOLUME_KEYS[key]},
+                })
+            continue
+
         if vacuumtube_running():
             # Real input injection; the shell is not in front.
             if key == "back":
@@ -200,13 +222,10 @@ async def cec_reader():
             continue
 
         back_pressed_at = None
-        try:
-            await ws.send(json.dumps({
-                "action": "cec_event",
-                "payload": {"key": key, "action": action},
-            }))
-        except Exception:
-            ws = await connect_ws()
+        ws = await send_ws(ws, {
+            "action": "cec_event",
+            "payload": {"key": key, "action": action},
+        })
 
     proc.terminate()
 
