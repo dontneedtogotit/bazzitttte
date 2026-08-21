@@ -8,6 +8,7 @@
 </head>
 <body>
     <div id="app">
+        <div id="fanart"></div>
         <header id="topbar">
             <div class="left">
                 <span class="logo">BAZzzzzITE</span>
@@ -30,11 +31,20 @@
 
         <main id="content">
             <section id="hero" class="tab-panel active">
-                <div class="hero-background" id="hero-bg"></div>
-                <div class="hero-content">
+                <div class="hero-background hidden" id="hero-bg"></div>
+                <div class="info-panel" id="info-panel">
                     <h1 id="hero-title">Welcome</h1>
+                    <div class="info-meta" id="info-meta"></div>
                     <p id="hero-desc">Your personal TV experience</p>
                     <button class="hero-btn" id="hero-play">&#9654; Play</button>
+                </div>
+                <div class="row">
+                    <h2>Continue Watching</h2>
+                    <div class="row-items" id="home-continue"></div>
+                </div>
+                <div class="row">
+                    <h2>Recently Added</h2>
+                    <div class="row-items" id="home-recent"></div>
                 </div>
             </section>
 

@@ -23,6 +23,7 @@ class TVApp {
         this.setupUpdates();
         this.setupProfiles();
         this.setupCameras();
+        this.setupInfoPanel();
         this.startClock();
         this.loadIPTV();
         this.loadEmulation();
@@ -294,16 +295,16 @@ class TVApp {
 
         switch (key) {
             case 'ArrowRight':
-                this.moveFocus(1);
+                this.moveHorizontal(1);
                 break;
             case 'ArrowLeft':
-                this.moveFocus(-1);
+                this.moveHorizontal(-1);
                 break;
             case 'ArrowDown':
-                this.moveFocusRow(1);
+                this.moveVertical(1);
                 break;
             case 'ArrowUp':
-                this.moveFocusRow(-1);
+                this.moveVertical(-1);
                 break;
             case 'Enter':
                 this.activateFocused();
@@ -336,6 +337,97 @@ class TVApp {
         }
     }
 
+    // Kodi shows details of whatever the cursor is on, with the artwork behind
+    // it. Focus is the cursor here, so the panel follows focus.
+    setupInfoPanel() {
+        document.addEventListener('focusin', (e) => {
+            const el = e.target;
+            if (el && el.classList && el.classList.contains('item')) {
+                this.updateInfoPanel(el);
+            }
+        });
+    }
+
+    updateInfoPanel(el) {
+        const titleEl = document.getElementById('hero-title');
+        const metaEl = document.getElementById('info-meta');
+        const descEl = document.getElementById('hero-desc');
+        const fanart = document.getElementById('fanart');
+
+        const title = el.dataset.title
+            || (el.querySelector('.item-title') || {}).textContent
+            || '';
+        if (titleEl) titleEl.textContent = title;
+        if (descEl) descEl.textContent = el.dataset.overview || '';
+
+        if (metaEl) {
+            metaEl.textContent = '';
+            const parts = [];
+            if (el.dataset.year) parts.push(['', el.dataset.year]);
+            if (el.dataset.rating) parts.push(['rating', '\u2605 ' + el.dataset.rating]);
+            if (el.dataset.runtime) parts.push(['', el.dataset.runtime]);
+            parts.forEach(([cls, text]) => {
+                const span = document.createElement('span');
+                if (cls) span.className = cls;
+                span.textContent = text;
+                metaEl.appendChild(span);
+            });
+        }
+
+        if (fanart) {
+            if (el.dataset.fanart) {
+                fanart.style.backgroundImage = 'url("' + el.dataset.fanart + '")';
+                fanart.classList.add('visible');
+            } else {
+                fanart.classList.remove('visible');
+            }
+        }
+    }
+
+    inSidebar(el) {
+        return !!(el && el.classList && el.classList.contains('nav-btn'));
+    }
+
+    focusSidebar() {
+        const target = document.querySelector('.nav-btn.active')
+            || document.querySelector('.nav-btn');
+        if (target) target.focus();
+    }
+
+    focusContent() {
+        const first = this.getFirstFocusable();
+        if (first) first.focus();
+    }
+
+    // Left/Right crosses between the menu and the content, as in Kodi: Right
+    // enters the content, and Left from the start of a row returns to the menu.
+    moveHorizontal(direction) {
+        const focused = document.activeElement;
+        if (this.inSidebar(focused)) {
+            if (direction > 0) this.focusContent();
+            return;
+        }
+        if (direction < 0 && focused && focused.classList.contains('item')) {
+            const row = focused.closest('.row-items');
+            if (row && Array.from(row.querySelectorAll('.item')).indexOf(focused) === 0) {
+                this.focusSidebar();
+                return;
+            }
+        }
+        this.moveFocus(direction);
+    }
+
+    moveVertical(direction) {
+        const focused = document.activeElement;
+        if (this.inSidebar(focused)) {
+            const buttons = Array.from(document.querySelectorAll('.nav-items .nav-btn'));
+            const next = buttons[buttons.indexOf(focused) + direction];
+            if (next) next.focus();
+            return;
+        }
+        this.moveFocusRow(direction);
+    }
+
     moveFocus(direction) {
         const items = document.querySelectorAll('.item:focus, .nav-btn:focus, .setting-item:focus, .icon-btn:focus');
         if (items.length === 0) {
@@ -359,7 +451,10 @@ class TVApp {
         const focused = document.activeElement;
         if (!focused || !focused.classList.contains('item')) return;
         
-        const rows = document.querySelectorAll('.row-items');
+        // Scoped to the visible panel; otherwise Down can land focus on a row
+        // inside a hidden tab.
+        const panel = document.querySelector('.tab-panel.active');
+        const rows = panel ? panel.querySelectorAll('.row-items') : [];
         const currentRow = focused.closest('.row-items');
         const currentIdx = Array.from(rows).indexOf(currentRow);
         const nextIdx = currentIdx + direction;
@@ -409,6 +504,7 @@ class TVApp {
         } else if (focused.id === 'hero-play') {
             const heroUrl = document.getElementById('hero-bg').dataset.url;
             if (heroUrl) this.playMedia(heroUrl, 'video');
+            return;
         } else if (focused.id === 'settings-btn') {
             document.getElementById('settings-overlay').classList.remove('hidden');
         } else if (focused.id === 'close-settings') {

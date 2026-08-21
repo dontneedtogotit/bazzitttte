@@ -8,6 +8,7 @@ Derived from [Bazzite Desktop (KDE)](https://github.com/ublue-os/bazzite) and pu
 
 A **real TV operating system** that replaces your TV's dead smart features and Kodi-on-KDE with a purpose-built 10-foot interface:
 
+- **Kodi-style 10-foot interface** — sidebar menu, fanart backdrops, info panel
 - **Cage** kiosk compositor locks down the display
 - **Chromium** kiosk renders a Netflix-style TV shell
 - **Jellyfin** media server for your local library
@@ -31,7 +32,7 @@ A **real TV operating system** that replaces your TV's dead smart features and K
 ## What's baked in
 
 - **Base:** `ghcr.io/ublue-os/bazzite:stable` (KDE Plasma Wayland, Intel open-source drivers)
-- **TV Shell:** Cage + Chromium kiosk with custom HTML/CSS/JS interface
+- **TV Shell:** Cage + Chromium kiosk, Kodi Estuary-style custom interface
 - **Video:** MPV with VA-API hardware decoding, WebSocket IPC for shell control
 - **Media Server:** Jellyfin (auto-starts, firewall opened for LAN)
 - **Remote:** libcec + CEC daemon translating Samsung remote buttons to shell input
@@ -72,6 +73,17 @@ ujust bazzzzite-iptv-update
 5. **Reboot** and enjoy your new TV OS.
 
 ## Using the TV
+
+### Interface
+
+The shell follows Kodi's Estuary layout:
+
+- **Sidebar menu** down the left (Home, Media, Live TV, Games, Cameras, YouTube, Apps)
+- **Fanart backdrop** of whatever is focused, dimmed behind the UI
+- **Info panel** showing title, year, rating, runtime and plot, updating as you move
+
+Navigation matches Kodi: **Up/Down** moves through the menu, **Right** enters the
+content, and **Left** from the first item in a row returns to the menu.
 
 ### Remote Control
 

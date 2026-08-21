@@ -74,23 +74,26 @@ const Jellyfin = {
         return `${this.baseUrl}/Items/${item.Id}/Images/Primary?width=${width}&quality=90`;
     },
 
-    renderContinueWatching(items) {
-        const container = document.getElementById('continue-watching');
-        container.innerHTML = '';
-        items.forEach(item => {
-            const el = window.tvApp.createItem(
-                item.Name,
-                this.getImageUrl(item, 300),
-                `${this.baseUrl}/Items/${item.Id}`
-            );
-            el.dataset.type = 'video';
-            el.dataset.url = `${this.baseUrl}/Items/${item.Id}/Download?api_key=${this.apiKey}`;
-            container.appendChild(el);
-        });
+    backdropUrl(item) {
+        // Fanart for the Kodi-style backdrop; falls back to the poster when a
+        // title has no backdrop image.
+        if (item.BackdropImageTags && item.BackdropImageTags.length) {
+            return `${this.baseUrl}/Items/${item.Id}/Images/Backdrop/0?quality=80`;
+        }
+        return this.getImageUrl(item, 1280);
     },
 
-    renderRecentlyAdded(items) {
-        const container = document.getElementById('recently-added');
+    runtimeMinutes(item) {
+        // Jellyfin reports runtime in 100ns ticks.
+        if (!item.RunTimeTicks) return '';
+        return Math.round(item.RunTimeTicks / 600000000) + ' min';
+    },
+
+    // The four rows differ only in container and item type, so they share one
+    // builder. Metadata rides along on the element for the info panel to read
+    // when the item gets focus.
+    renderRow(containerId, items, type = 'video') {
+        const container = document.getElementById(containerId);
         if (!container) return;
         container.innerHTML = '';
         items.forEach(item => {
@@ -99,43 +102,49 @@ const Jellyfin = {
                 this.getImageUrl(item, 300),
                 `${this.baseUrl}/Items/${item.Id}`
             );
-            el.dataset.type = 'video';
-            el.dataset.url = `${this.baseUrl}/Items/${item.Id}/Download?api_key=${this.apiKey}`;
+            el.dataset.type = type;
+            el.dataset.url = type === 'series'
+                ? `${this.baseUrl}/Items/${item.Id}`
+                : `${this.baseUrl}/Items/${item.Id}/Download?api_key=${this.apiKey}`;
+            el.dataset.title = item.Name || '';
+            el.dataset.year = item.ProductionYear || '';
+            el.dataset.rating = item.CommunityRating
+                ? Number(item.CommunityRating).toFixed(1) : '';
+            el.dataset.runtime = this.runtimeMinutes(item);
+            el.dataset.overview = item.Overview || '';
+            el.dataset.fanart = this.backdropUrl(item);
             container.appendChild(el);
         });
     },
 
-    renderMovies(items) {
-        const container = document.getElementById('movies-row');
-        container.innerHTML = '';
-        items.forEach(item => {
-            const el = window.tvApp.createItem(
-                item.Name,
-                this.getImageUrl(item, 300),
-                `${this.baseUrl}/Items/${item.Id}`
-            );
-            el.dataset.type = 'video';
-            el.dataset.url = `${this.baseUrl}/Items/${item.Id}/Download?api_key=${this.apiKey}`;
-            container.appendChild(el);
-        });
+    // Home and Media both surface these rows, in their own containers.
+    renderContinueWatching(items) {
+        this.renderRow('continue-watching', items);
+        this.renderRow('home-continue', items);
     },
-
-    renderShows(items) {
-        const container = document.getElementById('shows-row');
-        container.innerHTML = '';
-        items.forEach(item => {
-            const el = window.tvApp.createItem(
-                item.Name,
-                this.getImageUrl(item, 300),
-                `${this.baseUrl}/Items/${item.Id}`
-            );
-            el.dataset.type = 'series';
-            el.dataset.url = `${this.baseUrl}/Items/${item.Id}`;
-            container.appendChild(el);
-        });
+    renderRecentlyAdded(items) {
+        this.renderRow('recently-added', items);
+        this.renderRow('home-recent', items);
     },
+    renderMovies(items) { this.renderRow('movies-row', items); },
+    renderShows(items) { this.renderRow('shows-row', items, 'series'); },
 
     setHero(item) {
+        // Seed the fanart backdrop before anything has been focused.
+        const fanart = document.getElementById('fanart');
+        if (fanart) {
+            fanart.style.backgroundImage = `url("${this.backdropUrl(item)}")`;
+            fanart.classList.add('visible');
+        }
+        const meta = document.getElementById('info-meta');
+        if (meta) {
+            meta.textContent = '';
+            [item.ProductionYear, this.runtimeMinutes(item)].filter(Boolean).forEach(t => {
+                const span = document.createElement('span');
+                span.textContent = t;
+                meta.appendChild(span);
+            });
+        }
         document.getElementById('hero-bg').style.backgroundImage = `url(${this.getImageUrl(item, 1280)})`;
         document.getElementById('hero-bg').dataset.url = `${this.baseUrl}/Items/${item.Id}/Download?api_key=${this.apiKey}`;
         document.getElementById('hero-title').textContent = item.Name;

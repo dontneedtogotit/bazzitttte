@@ -31,29 +31,59 @@ html, body {
     width: 100vw;
     height: 100vh;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    position: relative;
+}
+
+/* Kodi-style fanart: a dimmed backdrop of whatever is focused, behind all UI. */
+#fanart {
+    position: fixed;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transition: opacity 0.5s ease, background-image 0.3s ease;
+    z-index: 0;
+}
+
+#fanart.visible {
+    opacity: 0.35;
+}
+
+#fanart::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to right,
+        var(--bg-primary) 0%,
+        rgba(20, 20, 20, 0.85) 35%,
+        rgba(20, 20, 20, 0.4) 100%);
 }
 
 header#topbar {
     display: flex;
+    flex-direction: column;
     justify-content: space-between;
-    align-items: center;
-    padding: 20px 60px;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, transparent 100%);
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    align-items: stretch;
+    width: calc(230px * var(--scale));
+    flex: 0 0 auto;
+    padding: calc(28px * var(--scale)) 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    position: relative;
     z-index: 100;
 }
 
 header .left {
     display: flex;
-    align-items: center;
-    gap: 40px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: calc(24px * var(--scale));
 }
 
 .logo {
+    padding: 0 calc(22px * var(--scale));
     font-size: 1.5em;
     font-weight: bold;
     color: var(--accent);
@@ -62,32 +92,41 @@ header .left {
 
 .nav-items {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .nav-btn {
     background: transparent;
     border: none;
+    border-left: 3px solid transparent;
     color: var(--text-secondary);
-    font-size: 1.1em;
-    padding: 8px 16px;
+    font-size: 1.15em;
+    padding: calc(12px * var(--scale)) calc(22px * var(--scale));
+    text-align: left;
     cursor: pointer;
-    border-radius: 4px;
-    transition: all 0.2s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .nav-btn:hover, .nav-btn.active {
     color: var(--text-primary);
+    border-left-color: var(--accent);
+    background: rgba(255, 255, 255, 0.05);
 }
 
+/* Focus is the cursor on a TV, so it must read louder than "active". */
 .nav-btn:focus {
-    outline: var(--focus-shadow);
+    outline: none;
+    color: var(--text-primary);
+    background: var(--accent);
+    border-left-color: var(--focus);
 }
 
 header .right {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 20px;
+    gap: calc(10px * var(--scale));
 }
 
 #clock {
@@ -126,12 +165,13 @@ header .right {
 main#content {
     flex: 1;
     overflow-y: auto;
-    padding-top: 80px;
+    position: relative;
+    z-index: 1;
 }
 
 .tab-panel {
     display: none;
-    padding: 0 60px 60px;
+    padding: calc(36px * var(--scale)) calc(44px * var(--scale)) calc(60px * var(--scale));
 }
 
 .tab-panel.active {
@@ -140,12 +180,47 @@ main#content {
 
 #hero {
     position: relative;
-    height: 70vh;
-    min-height: 500px;
+}
+
+.hero-background.hidden {
+    display: none;
+}
+
+/* Kodi's info panel: details of whatever is focused, over the fanart. */
+.info-panel {
+    position: relative;
+    z-index: 1;
+    max-width: 46em;
+    min-height: calc(190px * var(--scale));
+    margin-bottom: calc(28px * var(--scale));
+}
+
+.info-meta {
     display: flex;
-    align-items: flex-end;
-    padding: 60px;
-    margin-top: -80px;
+    flex-wrap: wrap;
+    gap: calc(14px * var(--scale));
+    align-items: center;
+    color: var(--text-secondary);
+    font-size: 1.05em;
+    margin-bottom: calc(14px * var(--scale));
+    min-height: 1.4em;
+}
+
+.info-meta .rating {
+    color: #ffd700;
+}
+
+.info-meta span:not(:last-child)::after {
+    content: '\00b7';
+    margin-left: calc(14px * var(--scale));
+    color: rgba(255, 255, 255, 0.3);
+}
+
+#hero-desc {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .hero-background {
@@ -168,12 +243,6 @@ main#content {
     right: 0;
     height: 50%;
     background: linear-gradient(to top, var(--bg-primary) 0%, transparent 100%);
-}
-
-.hero-content {
-    position: relative;
-    z-index: 1;
-    max-width: 600px;
 }
 
 #hero-title {
