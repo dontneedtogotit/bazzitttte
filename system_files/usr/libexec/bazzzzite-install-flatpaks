@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# bazzzzite-install-flatpaks: install the Flatpak apps the TV depends on.
+#
+# Flatpaks cannot be baked into a bootc image, so they are pulled on first boot
+# once the network and the flathub remote are available. The stamp file is only
+# written on success, so a failed run (no network yet, mirror down) simply
+# retries on the next boot instead of leaving the TV without its apps.
+set -euo pipefail
+
+STAMP="/var/lib/bazzzzite/flatpaks-installed"
+APPS=(
+    rocks.shy.VacuumTube   # YouTube Leanback: adblock, SponsorBlock, DeArrow
+)
+
+mkdir -p "$(dirname "$STAMP")"
+
+if ! flatpak remotes --system 2>/dev/null | grep -q flathub; then
+    flatpak remote-add --system --if-not-exists flathub \
+        https://dl.flathub.org/repo/flathub.flatpakrepo
+fi
+
+failed=0
+for app in "${APPS[@]}"; do
+    if flatpak info --system "$app" >/dev/null 2>&1; then
+        echo "${app} already installed"
+        continue
+    fi
+    echo "Installing ${app}..."
+    if ! flatpak install --system --noninteractive --assumeyes flathub "$app"; then
+        echo "Failed to install ${app}; will retry on next boot" >&2
+        failed=1
+    fi
+done
+
+if [[ "$failed" -eq 0 ]]; then
+    touch "$STAMP"
+    echo "All Bazzzzite flatpaks installed."
+else
+    exit 1
+fi

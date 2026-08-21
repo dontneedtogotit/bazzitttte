@@ -209,10 +209,9 @@ class TVApp {
     }
 
     setupYouTube() {
+        // VacuumTube keeps its own login, so there is no account/guest split.
         const ytApps = [
-            { name: 'Continue as You', icon: '▶', app: 'youtube-tv' },
-            { name: 'Guest', icon: '👤', app: 'youtube-tv-guest' },
-            { name: 'Sign in to YouTube', icon: '🔑', app: 'youtube-tv-setup' },
+            { name: 'Open YouTube', icon: '▶', app: 'youtube-tv' },
         ];
         const ytAppRow = document.getElementById('yt-app-row');
         if (ytAppRow) {
@@ -549,8 +548,6 @@ class TVApp {
         const apps = [
             { name: 'Jellyfin', icon: 'J', url: 'http://localhost:8096', type: 'web' },
             { name: 'YouTube', icon: '▶', app: 'youtube-tv', type: 'app' },
-            { name: 'YouTube Guest', icon: '👤', app: 'youtube-tv-guest', type: 'app' },
-            { name: 'Sign in to YouTube', icon: '🔑', app: 'youtube-tv-setup', type: 'app' },
             { name: 'Twitch', icon: 'T', url: 'https://twitch.tv', type: 'web' },
             { name: 'Spotify', icon: 'S', url: 'https://open.spotify.com', type: 'web' },
             { name: 'File Manager', icon: '📁', app: 'filemanager', type: 'app' },

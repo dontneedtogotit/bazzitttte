@@ -1,0 +1,10 @@
+[Unit]
+Description=VacuumTube (YouTube Leanback)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/bazzzzite-youtube start
+ExecStop=/usr/libexec/bazzzzite-youtube stop
+Restart=no

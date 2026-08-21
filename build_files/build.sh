@@ -24,7 +24,7 @@ systemctl set-default graphical.target
 # --skip-unavailable and were being dropped on every build without a trace:
 # Jellyfin ships as the jellyfin.container quadlet instead, and cec-client
 # comes from libcec.
-dnf5 install -y cage chromium mpv libcec ffmpeg yt-dlp \
+dnf5 install -y cage chromium mpv libcec ffmpeg yt-dlp ydotool \
     python3-websockets python3-aiohttp
 
 # Nice-to-haves: the TV still works without any of them, so tolerate absence.
@@ -50,20 +50,8 @@ if [[ ! -f /usr/share/vosk-models/vosk-model-small-en-us-0.15/model.tar.gz ]]; t
     fi
 fi
 
-# Extracted once to a stable system path (not inside a profile dir) so it survives
-# the guest profile being wiped before every launch, and loads via --load-extension
-# for both account and guest mode.
-if [[ ! -d /usr/share/bazzzzite/ublock-origin ]]; then
-    echo "Installing uBlock Origin for YouTube..."
-    curl -L -o /tmp/ublock.crx \
-        "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=120&acceptformat=crx2,crx3&x=id%3Dcjpalhdlnbpafiamejdnhcphjbkeiagm%26uc" 2>/dev/null || true
-    if [[ -f /tmp/ublock.crx ]]; then
-        mkdir -p /usr/share/bazzzzite/ublock-origin || true
-        unzip -q /tmp/ublock.crx -d /usr/share/bazzzzite/ublock-origin 2>/dev/null || true
-        rm -f /tmp/ublock.crx
-    fi
-fi
-
+systemctl enable bazzzzite-flatpaks.service
+systemctl enable bazzzzite-ydotoold.service
 systemctl enable bazzzzite-rygel.service
 systemctl enable bazzzzite-update-check.timer
 
@@ -79,8 +67,8 @@ chmod +x /usr/libexec/bazzzzite-yt
 chmod +x /usr/libexec/bazzzzite-fm
 chmod +x /usr/libexec/bazzzzite-update-check
 chmod +x /usr/libexec/bazzzzite-cam
-chmod +x /usr/libexec/bazzzzite-yt-app
-chmod +x /usr/libexec/bazzzzite-yt-cec
+chmod +x /usr/libexec/bazzzzite-youtube
+chmod +x /usr/libexec/bazzzzite-install-flatpaks
 mkdir -p /mnt/media || true
 mkdir -p /etc/bazzzzite || true
 mkdir -p /usr/share/vosk-models || true

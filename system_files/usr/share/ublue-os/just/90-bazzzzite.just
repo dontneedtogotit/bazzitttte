@@ -240,29 +240,22 @@ bazzzzite-cam-scan:
     /usr/libexec/bazzzzite-cam scan
 
 [group('Bazzzzite TV')]
-bazzzzite-yt-app:
+bazzzzite-youtube:
     #!/usr/bin/bash
     set -eou pipefail
-    echo "Starting YouTube (account mode)..."
-    systemctl --user start bazzzzite-yt-app@account.service
+    echo "Starting VacuumTube..."
+    systemctl --user start bazzzzite-youtube.service
 
 [group('Bazzzzite TV')]
-bazzzzite-yt-app-guest:
+bazzzzite-youtube-stop:
     #!/usr/bin/bash
     set -eou pipefail
-    echo "Starting YouTube (guest mode)..."
-    systemctl --user start bazzzzite-yt-app@guest.service
+    systemctl --user stop bazzzzite-youtube.service
+    echo "VacuumTube stopped. Back at the TV shell."
 
 [group('Bazzzzite TV')]
-bazzzzite-yt-signin:
+bazzzzite-install-flatpaks:
     #!/usr/bin/bash
     set -eou pipefail
-    echo "Opening Google sign-in for YouTube (windowed)..."
-    systemctl --user start bazzzzite-yt-app@setup.service
-
-[group('Bazzzzite TV')]
-bazzzzite-yt-app-stop:
-    #!/usr/bin/bash
-    set -eou pipefail
-    systemctl --user stop bazzzzite-yt-app@account.service bazzzzite-yt-app@guest.service bazzzzite-yt-app@setup.service
-    echo "YouTube stopped. Returning to TV shell..."
+    sudo systemctl start bazzzzite-flatpaks.service
+    systemctl status bazzzzite-flatpaks.service --no-pager || true

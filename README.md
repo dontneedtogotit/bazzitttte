@@ -38,7 +38,7 @@ A **real TV operating system** that replaces your TV's dead smart features and K
 - **Emulation:** RetroArch + Dolphin (GameCube/Wii) + PCSX2 (PS2) via ujust
 - **IPTV:** m3u playlist support with EPG-ready channel list
 - **YouTube:** yt-dlp + MPV (ad-free, 1080p60, no tracking)
-- **YouTube TV:** Fullscreen YouTube app (Tizen-like) with login, uBlock Origin ad blocking, and guest mode
+- **YouTube:** VacuumTube (YouTube Leanback) with ad blocking, SponsorBlock and DeArrow
 - **Voice:** Vosk offline speech recognition (wake word + commands)
 - **Game Mode:** Disables Cage compositor, sets CPU governor to performance
 - **DLNA:** Rygel renderer for Samsung AllShare / casting
@@ -79,11 +79,11 @@ Your **Samsung Anynet+ remote** works via HDMI-CEC:
 
 - **Arrow keys:** Navigate the UI
 - **Enter/OK:** Select
-- **Return/Exit:** Go back
+- **Return/Exit:** Go back (hold ~1.2s inside YouTube to quit back to the shell)
 - **Home:** Return to home screen
 - **Play/Pause:** Toggle video playback
 - **Volume Up/Down:** System volume
-- **Channel Up/Down:** Not mapped by default
+- **Channel Up/Down:** Page up/down inside apps
 
 ### Voice Commands (optional)
 
@@ -109,7 +109,7 @@ Enable in Settings > Features > Voice, then say:
 | Media Library | Home tab (Continue Watching, Movies, TV Shows) |
 | Live TV | Live TV tab (after configuring IPTV) |
 | YouTube | YouTube tab (search + play, ad-free) |
-| YouTube TV | Apps tab (fullscreen app with login, ad blocking) |
+| YouTube (VacuumTube) | Apps tab or YouTube tab — ad-free, SponsorBlock |
 | Emulation | Games tab (select system, launch) |
 | Jellyfin Web UI | Apps tab, or `http://localhost:8096` |
 | Settings | Gear icon in top-right |
@@ -143,10 +143,9 @@ ujust bazzzzite-edid            # Detect optimal HDMI mode for your TV
 ujust bazzzzite-update          # OTA update + flatpak update
 ujust bazzzzite-rollback        # Rollback to previous OS image
 ujust bazzzzite-update-status   # Check for updates without applying
-ujust bazzzzite-yt-app          # Launch YouTube (account mode, ad-blocked)
-ujust bazzzzite-yt-app-guest    # Launch YouTube (guest mode, ad-blocked, wiped on every launch)
-ujust bazzzzite-yt-signin       # Windowed Google sign-in for the account profile
-ujust bazzzzite-yt-app-stop     # Exit YouTube and return to home
+ujust bazzzzite-youtube          # Launch YouTube (VacuumTube)
+ujust bazzzzite-youtube-stop     # Exit YouTube and return to home
+ujust bazzzzite-install-flatpaks # Retry installing VacuumTube
 ```
 
 ## Storage layout (256GB NVMe)
@@ -189,39 +188,48 @@ ROMs go on your media drive. Launch from Games tab.
 3. Run `ujust bazzzzite-iptv-update` to fetch channels
 4. Channels appear in the Live TV tab
 
-## YouTube TV (Tizen-like fullscreen app)
+## YouTube (VacuumTube)
 
-YouTube TV launches a dedicated fullscreen YouTube experience, similar to Samsung Smart TV's YouTube app.
+YouTube runs in **VacuumTube**, a Wayland-native wrapper around YouTube's
+Leanback ("TV") interface — the same 10-foot UI a Samsung TV shows, with the
+enhancements TizenTube is known for built in.
 
 ### Features
-- **Fullscreen TV interface** (`youtube.com/tv`) optimized for 10-foot UI
-- **Login support** — persistent profile, plus a windowed one-time sign-in flow for easier Google 2FA
-- **Ad blocking** — uBlock Origin loaded in *both* account and guest mode
-- **Guest mode** — a real profile that's wiped clean before every launch (not Chromium's built-in Incognito, so ad blocking still works)
-- **No mouse pointer** — hidden for an authentic remote-control feel
-- **CEC remote navigation** — works directly in YouTube
-- **Hardware acceleration** — VA-API video decoding
+- **Real TV interface** — YouTube Leanback, designed for a remote
+- **Ad blocking** — video and feed ads, built in
+- **SponsorBlock** — skips sponsored segments automatically
+- **DeArrow** — replaces clickbait titles and thumbnails
+- **Return Dislikes**, resolution unlock and codec filtering
+- **Hardware decoding** — native Wayland, no browser kiosk involved
+- **Own login** — sign in once inside the app; no separate profile juggling
 
 ### How to use
-1. **First time only — sign in:** `ujust bazzzzite-yt-signin` opens a normal windowed browser (not kiosk) so Google's login/2FA flow works smoothly. Sign in, then exit (Escape) — the session persists in the account profile.
-2. **From Apps tab:** Select **YouTube** (account) or **YouTube Guest**
-3. **From CLI:**
+1. **From the shell:** Apps tab or YouTube tab → **YouTube**
+2. **From CLI:**
    ```bash
-   ujust bazzzzite-yt-app        # account mode
-   ujust bazzzzite-yt-app-guest  # guest mode
-   ujust bazzzzite-yt-signin     # windowed sign-in
-   ujust bazzzzite-yt-app-stop   # exit back to TV shell
+   ujust bazzzzite-youtube       # launch
+   ujust bazzzzite-youtube-stop  # quit, back to the TV shell
    ```
-4. **Navigation:** Use your Samsung remote (arrow keys, Enter, Back, Play/Pause)
-5. **Exit:** Press Back/Escape on your remote or keyboard
 
-### Profiles
-- **Account mode:** Uses `~/.config/bazzzzite/youtube-tv` — login persists across sessions
-- **Guest mode:** Uses `~/.config/bazzzzite/youtube-tv-guest`, which is deleted and recreated at the start of every launch — nothing persists, but it's a real profile so uBlock and other mods still apply
+VacuumTube installs automatically on first boot (it is a Flatpak, so it cannot
+be baked into the image). If it is missing — for example the first boot had no
+network — run `ujust bazzzzite-install-flatpaks` to retry.
 
-### Switching between account and guest
-1. Exit YouTube (`ujust bazzzzite-yt-app-stop`)
-2. Launch the other mode (`ujust bazzzzite-yt-app` or `ujust bazzzzite-yt-app-guest`)
+### Remote control
+Cage is a Wayland compositor, so `xdotool` cannot deliver remote presses to an
+app. Presses are injected as real input events with **ydotool** instead, driven
+by `bazzzzite-cecd`, which sends them to the shell or to VacuumTube depending
+on which is in front.
+
+| Button | In VacuumTube |
+|--------|---------------|
+| Arrows / OK | Navigate and select |
+| **Back (short press)** | Back — leaves the video, returns to browsing |
+| **Back (long press, 1.2s)** | Quits YouTube, back to the TV shell |
+| Play/Pause, Volume, Mute | As expected |
+
+VacuumTube binds its own "back" to a right-click, so a short Back press sends
+exactly that. Tune the hold time with `CEC_LONG_PRESS_SECONDS`.
 
 ## IP cameras (picture-in-picture + motion)
 

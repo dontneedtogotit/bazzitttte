@@ -1,24 +1,43 @@
 #!/usr/bin/env python3
 """
 bazzzzite-cecd: HDMI-CEC daemon for TV remote control.
-Reads CEC events from cec-client and forwards them to the TV bridge WebSocket.
+
+Only one process can hold the CEC device, so this daemon owns it and routes
+each press to whichever UI is in front:
+
+  * TV shell in front  -> forward over the WebSocket, as a web app it cannot
+                          receive real key events from the compositor anyway.
+  * VacuumTube in front -> inject real input with ydotool. xdotool/wmctrl are
+                          X11-only and do nothing under Cage, which is why the
+                          remote had no effect inside the YouTube app.
+
+Back is press-length sensitive: a short press is the app's own "back", a long
+press quits the app and returns to the TV shell.
 """
 
+import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
+import time
+
 import websockets
-import asyncio
 
 WS_URL = "ws://localhost:8080/ws"
+TOKEN_FILE = "/etc/bazzzzite/ws-token"
 CEC_DEVICE = os.environ.get("CEC_DEVICE", "/dev/cec0")
+VACUUMTUBE_ID = "rocks.shy.VacuumTube"
+
+# Seconds a Back press must be held to quit the foreground app.
+LONG_PRESS_SECONDS = float(os.environ.get("CEC_LONG_PRESS_SECONDS", "1.2"))
 
 CEC_KEYMAP = {
     "play": "play",
     "pause": "pause",
     "stop": "stop",
-    "fast-forward": "fast_forward",
+    "fast_forward": "fast_forward",
     "rewind": "rewind",
     "next": "next",
     "previous": "previous",
@@ -37,62 +56,157 @@ CEC_KEYMAP = {
     "mute": "mute",
 }
 
+# Linux input event codes (see linux/input-event-codes.h). ydotool takes these
+# numerically, which avoids depending on its keyname table.
+KEYCODES = {
+    "up": 103,
+    "down": 108,
+    "left": 105,
+    "right": 106,
+    "enter": 28,
+    "play": 164,        # KEY_PLAYPAUSE
+    "pause": 164,
+    "stop": 166,        # KEY_STOPCD
+    "fast_forward": 208,
+    "rewind": 168,
+    "next": 163,
+    "previous": 165,
+    "home": 172,
+    "mute": 113,
+    "channel_up": 104,      # KEY_PAGEUP
+    "channel_down": 109,    # KEY_PAGEDOWN
+    "volume_up": 115,
+    "volume_down": 114,
+}
 
-async def send_event(websocket, key, action="keydown"):
+
+def read_token():
     try:
-        await websocket.send(json.dumps({
-            "action": "cec_event",
-            "payload": {"key": key, "action": action}
-        }))
+        with open(TOKEN_FILE) as fh:
+            return fh.read().strip()
+    except OSError:
+        return None
+
+
+def vacuumtube_running():
+    try:
+        res = subprocess.run(
+            ["flatpak", "ps", "--columns=application"],
+            capture_output=True, text=True, timeout=3,
+        )
+        return VACUUMTUBE_ID in res.stdout.split()
     except Exception:
-        pass
+        return False
+
+
+def ydotool(*args):
+    try:
+        subprocess.run(
+            ["ydotool", *args],
+            env={**os.environ, "YDOTOOL_SOCKET": "/run/ydotoold.sock"},
+            capture_output=True, timeout=3,
+        )
+    except Exception as exc:
+        print("ydotool failed: {}".format(exc), file=sys.stderr)
+
+
+def inject_key(name):
+    code = KEYCODES.get(name)
+    if code is None:
+        return
+    ydotool("key", "{}:1".format(code), "{}:0".format(code))
+
+
+def inject_back():
+    # VacuumTube binds "back" to a right-click rather than Escape.
+    ydotool("click", "0xC1")
+
+
+def quit_foreground_app():
+    subprocess.run(["/usr/libexec/bazzzzite-youtube", "stop"], capture_output=True)
+
+
+KEY_RE = re.compile(r"key (pressed|released):\s*(.+?)\s*(?:\(|$)")
 
 
 def parse_cec_line(line):
-    line = line.strip()
-    if "key pressed" in line:
-        for ceckey, jsKey in CEC_KEYMAP.items():
-            if ceckey in line.lower():
-                return jsKey, "keydown"
-    elif "key released" in line:
-        for ceckey, jsKey in CEC_KEYMAP.items():
-            if ceckey in line.lower():
-                return jsKey, "keyup"
-    return None, None
+    """Pull the exact key name out of a cec-client line.
+
+    Matching by substring is wrong: "up" is contained in "volume up" and
+    "channel up", so those were being reported as plain navigation. libcec also
+    spells multi-word keys with spaces, which never matched the keymap at all.
+    """
+    match = KEY_RE.search(line.strip().lower())
+    if not match:
+        return None, None
+    action = "keydown" if match.group(1) == "pressed" else "keyup"
+    name = re.sub(r"[\s-]+", "_", match.group(2).strip())
+    return CEC_KEYMAP.get(name), action
+
+
+async def connect_ws():
+    """Connect and complete the auth handshake the bridge requires."""
+    token = read_token()
+    while True:
+        try:
+            ws = await websockets.connect(WS_URL, ping_interval=20, ping_timeout=20)
+            await ws.send(json.dumps({"action": "auth", "payload": {"token": token}}))
+            reply = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+            if reply.get("action") == "auth_ok":
+                print("Connected to TV bridge")
+                return ws
+            print("Bridge rejected auth: {}".format(reply), file=sys.stderr)
+            await ws.close()
+        except Exception:
+            pass
+        await asyncio.sleep(2)
 
 
 async def cec_reader():
     proc = subprocess.Popen(
         ["cec-client", "-d", "1", "-t", "p"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        text=True,
-        bufsize=1
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        text=True, bufsize=1,
     )
-    print("CEC reader started")
-
-    async def connect_ws():
-        while True:
-            try:
-                return await websockets.connect(WS_URL, ping_interval=20, ping_timeout=20)
-            except Exception:
-                await asyncio.sleep(1)
+    print("CEC reader started on {}".format(CEC_DEVICE))
 
     ws = await connect_ws()
+    loop = asyncio.get_running_loop()
+    back_pressed_at = None
 
     while True:
-        try:
-            line = await asyncio.get_running_loop().run_in_executor(None, proc.stdout.readline)
-        except Exception:
-            break
+        line = await loop.run_in_executor(None, proc.stdout.readline)
         if not line:
             break
         key, action = parse_cec_line(line)
-        if key:
-            try:
-                await send_event(ws, key, action)
-            except Exception:
-                ws = await connect_ws()
+        if not key:
+            continue
+
+        if vacuumtube_running():
+            # Real input injection; the shell is not in front.
+            if key == "back":
+                if action == "keydown":
+                    back_pressed_at = time.monotonic()
+                elif action == "keyup" and back_pressed_at is not None:
+                    held = time.monotonic() - back_pressed_at
+                    back_pressed_at = None
+                    if held >= LONG_PRESS_SECONDS:
+                        print("Back held {:.1f}s -> quitting app".format(held))
+                        quit_foreground_app()
+                    else:
+                        inject_back()
+            elif action == "keydown":
+                inject_key(key)
+            continue
+
+        back_pressed_at = None
+        try:
+            await ws.send(json.dumps({
+                "action": "cec_event",
+                "payload": {"key": key, "action": action},
+            }))
+        except Exception:
+            ws = await connect_ws()
 
     proc.terminate()
 

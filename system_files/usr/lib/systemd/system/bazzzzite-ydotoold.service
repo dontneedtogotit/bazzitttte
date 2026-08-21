@@ -1,0 +1,14 @@
+[Unit]
+Description=ydotool daemon (virtual input for CEC remote injection)
+Documentation=man:ydotoold(8)
+
+[Service]
+Type=simple
+# Creates /dev/uinput-backed virtual devices, so the compositor sees remote
+# presses as real input. xdotool cannot do this under Wayland.
+ExecStart=/usr/bin/ydotoold --socket-path=/run/ydotoold.sock --socket-own=0:0
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

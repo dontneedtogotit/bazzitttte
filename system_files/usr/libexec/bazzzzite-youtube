@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# bazzzzite-youtube: launch VacuumTube (YouTube Leanback) over the TV shell.
+#
+# VacuumTube is a Wayland-native Electron app with ad blocking, SponsorBlock,
+# DeArrow and hardware decoding built in, so no browser profile juggling or
+# extension loading is needed here.
+#
+# It connects to the same Cage compositor as the shell and stacks on top of it,
+# so quitting VacuumTube reveals the TV shell again -- no nested compositor.
+set -euo pipefail
+
+APP_ID="rocks.shy.VacuumTube"
+
+case "${1:-start}" in
+    start)
+        if ! flatpak info "$APP_ID" >/dev/null 2>&1; then
+            echo "VacuumTube is not installed yet." >&2
+            echo "It installs automatically on boot; run 'sudo systemctl start bazzzzite-flatpaks' to retry now." >&2
+            exit 1
+        fi
+        echo "Starting VacuumTube..."
+        exec flatpak run "$APP_ID"
+        ;;
+    stop)
+        flatpak kill "$APP_ID" 2>/dev/null || true
+        echo "VacuumTube stopped."
+        ;;
+    status)
+        if flatpak ps --columns=application 2>/dev/null | grep -qx "$APP_ID"; then
+            echo "running"
+        else
+            echo "stopped"
+        fi
+        ;;
+    *)
+        echo "usage: bazzzzite-youtube [start|stop|status]" >&2
+        exit 1
+        ;;
+esac

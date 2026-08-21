@@ -1,0 +1,16 @@
+[Unit]
+Description=Install Bazzzzite Flatpak apps (VacuumTube)
+After=network-online.target flatpak-add-fedora-repos.service
+Wants=network-online.target
+ConditionPathExists=!/var/lib/bazzzzite/flatpaks-installed
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/bazzzzite-install-flatpaks
+RemainAfterExit=yes
+# A missing mirror or an offline first boot should not fail the boot; the
+# condition above makes this retry until it succeeds.
+SuccessExitStatus=0 1
+
+[Install]
+WantedBy=multi-user.target
