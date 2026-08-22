@@ -7,6 +7,9 @@ Type=simple
 ExecStart=/usr/libexec/bazzzzite-cecd
 Restart=on-failure
 RestartSec=5
+# 78 is "this machine has no CEC adapter". Restarting cannot fix that, and the
+# service should sit visibly failed rather than spin every 5 seconds.
+RestartPreventExitStatus=78
 
 [Install]
 WantedBy=multi-user.target

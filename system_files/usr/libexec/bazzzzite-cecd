@@ -16,6 +16,7 @@ press quits the app and returns to the TV shell.
 """
 
 import asyncio
+import glob
 import json
 import os
 import re
@@ -176,13 +177,54 @@ async def send_ws(ws, message):
     return ws
 
 
+# EX_CONFIG: the unit refuses to restart on this, since no amount of retrying
+# will make absent hardware appear.
+NO_ADAPTER = 78
+
+
+def find_cec_adapter():
+    """Return the CEC adapter to read, or None if the machine has none.
+
+    The kernel exposes wired CEC as /dev/cecN, while a Pulse-Eight USB adapter
+    is a serial device only libcec can identify. Most Intel NUCs wire neither.
+    Without this check cec-client just produces no output, the reader loop sees
+    EOF and exits 0, and a machine that can never receive a single button press
+    is indistinguishable from a healthy daemon -- which is exactly how this
+    went unnoticed.
+    """
+    devices = sorted(glob.glob("/dev/cec*"))
+    if devices:
+        return devices[0]
+    try:
+        res = subprocess.run(
+            ["cec-client", "-l"], capture_output=True, text=True, timeout=10,
+        )
+    except Exception:
+        return None
+    for line in res.stdout.splitlines():
+        if "com port:" in line.lower():
+            return line.strip()
+    return None
+
+
 async def cec_reader():
+    adapter = find_cec_adapter()
+    if adapter is None:
+        print(
+            "No CEC adapter found: this machine's HDMI does not expose CEC "
+            "(most Intel NUCs do not wire it) and no USB-CEC adapter is "
+            "attached. The TV remote cannot be read. Use a Pulse-Eight "
+            "USB-CEC adapter, or a USB IR receiver, for remote control.",
+            file=sys.stderr,
+        )
+        return NO_ADAPTER
+
     proc = subprocess.Popen(
         ["cec-client", "-d", "1", "-t", "p"],
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         text=True, bufsize=1,
     )
-    print("CEC reader started on {}".format(CEC_DEVICE))
+    print("CEC reader started on {}".format(adapter))
 
     ws = await connect_ws()
     loop = asyncio.get_running_loop()
@@ -228,10 +270,15 @@ async def cec_reader():
         })
 
     proc.terminate()
+    # Reaching here means cec-client stopped talking: the adapter was unplugged
+    # or libcec gave up. That is a failure, so systemd restarts us -- exiting 0
+    # is what made the daemon quietly stay dead.
+    print("cec-client stopped producing output", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":
     try:
-        asyncio.run(cec_reader())
+        sys.exit(asyncio.run(cec_reader()) or 0)
     except KeyboardInterrupt:
         sys.exit(0)
