@@ -1,3 +1,8 @@
+# Named 60-custom.just because Bazzite's /usr/share/ublue-os/justfile imports a
+# fixed list of filenames, and 60-custom.just is the optional slot it reserves
+# for a derived image. Under any other name the file is installed but never
+# imported, so every recipe here silently does not exist.
+
 [group('Bazzzzite TV')]
 bazzzzite-status:
     #!/usr/bin/bash
