@@ -38,6 +38,9 @@ class TVApp {
         this.setupCameras();
         this.setupInfoPanel();
         this.startClock();
+        // Land focus on the launcher at boot: under Cage there is no pointer,
+        // so an unfocused page makes the remote appear dead.
+        this.switchTab('home');
         this.loadIPTV();
         this.loadEmulation();
         this.loadApps();
@@ -217,6 +220,17 @@ class TVApp {
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 this.switchTab(btn.dataset.tab);
+            });
+        });
+
+        document.querySelectorAll('.app-tile').forEach(tile => {
+            tile.addEventListener('click', (e) => {
+                // Enter on a focused button already reaches activateFocused
+                // through the key handler; the click it also synthesises has
+                // detail 0 and would run the action a second time.
+                if (e.detail === 0) return;
+                tile.focus();
+                this.activateFocused();
             });
         });
     }
@@ -412,6 +426,57 @@ class TVApp {
         return !!(el && el.classList && el.classList.contains('nav-btn'));
     }
 
+    inGrid(el) {
+        return !!(el && el.closest && el.closest('.app-grid'));
+    }
+
+    // Measured rather than hard-coded, so a reflowed grid cannot leave Up/Down
+    // stepping by a column count that no longer matches what is on screen.
+    gridColumns(grid) {
+        const tiles = Array.from(grid.querySelectorAll('.app-tile'));
+        if (tiles.length === 0) return 1;
+        const top = tiles[0].offsetTop;
+        let cols = 0;
+        for (const tile of tiles) {
+            if (tile.offsetTop !== top) break;
+            cols++;
+        }
+        return cols || 1;
+    }
+
+    gridTiles(focused) {
+        const grid = focused.closest('.app-grid');
+        const tiles = Array.from(grid.querySelectorAll('.app-tile'));
+        return { grid, tiles, idx: tiles.indexOf(focused) };
+    }
+
+    moveGridHorizontal(direction) {
+        const { grid, tiles, idx } = this.gridTiles(document.activeElement);
+        if (idx < 0) return;
+        const cols = this.gridColumns(grid);
+        const col = idx % cols;
+        // Clamped to the row: stepping off the end onto the next row's first
+        // tile reads as the focus teleporting across the screen.
+        if (direction > 0 && col === cols - 1) return;
+        if (direction < 0 && col === 0) return;
+        const next = tiles[idx + direction];
+        if (next) next.focus();
+    }
+
+    moveGridVertical(direction) {
+        const { grid, tiles, idx } = this.gridTiles(document.activeElement);
+        if (idx < 0) return;
+        const cols = this.gridColumns(grid);
+        let target = idx + direction * cols;
+        // The last row is usually short. Down from a column past its end should
+        // still reach the last tile instead of doing nothing at all.
+        if (direction > 0 && target >= tiles.length && idx < tiles.length - 1) {
+            target = tiles.length - 1;
+        }
+        const next = tiles[target];
+        if (next) next.focus();
+    }
+
     focusSidebar() {
         const target = document.querySelector('.nav-btn.active')
             || document.querySelector('.nav-btn');
@@ -427,6 +492,10 @@ class TVApp {
     // enters the content, and Left from the start of a row returns to the menu.
     moveHorizontal(direction) {
         const focused = document.activeElement;
+        if (this.inGrid(focused)) {
+            this.moveGridHorizontal(direction);
+            return;
+        }
         if (this.inSidebar(focused)) {
             if (direction > 0) this.focusContent();
             return;
@@ -443,6 +512,10 @@ class TVApp {
 
     moveVertical(direction) {
         const focused = document.activeElement;
+        if (this.inGrid(focused)) {
+            this.moveGridVertical(direction);
+            return;
+        }
         if (this.inSidebar(focused)) {
             const buttons = Array.from(document.querySelectorAll('.nav-items .nav-btn'));
             const next = buttons[buttons.indexOf(focused) + direction];
@@ -498,6 +571,15 @@ class TVApp {
         const focused = document.activeElement;
         if (!focused) return;
         
+        if (focused.classList.contains('app-tile')) {
+            if (focused.dataset.tab) {
+                this.switchTab(focused.dataset.tab, true);
+            } else if (focused.dataset.action === 'open-settings') {
+                document.getElementById('settings-overlay').classList.remove('hidden');
+            }
+            return;
+        }
+
         if (focused.classList.contains('item')) {
             const url = focused.dataset.url || focused.dataset.src;
             const type = focused.dataset.type || 'video';
@@ -539,17 +621,29 @@ class TVApp {
     getFirstFocusable() {
         const activePanel = document.querySelector('.tab-panel.active');
         if (!activePanel) return null;
-        return activePanel.querySelector('.item, .nav-btn, .setting-item, .icon-btn');
+        return activePanel.querySelector('.app-tile, .item, .nav-btn, .setting-item, .icon-btn');
     }
 
-    switchTab(tab) {
+    // focusPanel moves focus into the panel itself, which is what a launcher
+    // tile wants; the menu bar keeps its own focus when it is the one switching.
+    switchTab(tab, focusPanel = false) {
         this.currentTab = tab;
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === tab + '-panel'));
-        
-        if (tab === 'home') {
+        // On home the tiles are the menu, so the bar is hidden behind them.
+        document.body.classList.toggle('home-active', tab === 'home');
+
+        if (tab === 'home' || focusPanel) {
             const first = this.getFirstFocusable();
-            if (first) first.focus();
+            if (first) {
+                first.focus();
+            } else if (focusPanel) {
+                // A panel can be empty -- no Jellyfin library configured yet, no
+                // IPTV channels. Focus would then stay on the tile that just
+                // went off screen, fall to <body>, and the arrows would do
+                // nothing at all; the menu bar is somewhere real to land.
+                this.focusSidebar();
+            }
         }
     }
 

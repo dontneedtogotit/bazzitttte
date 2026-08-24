@@ -30,25 +30,50 @@
         </header>
 
         <main id="content">
-            <section id="hero" class="tab-panel active">
-                <div class="hero-background hidden" id="hero-bg"></div>
-                <div class="info-panel" id="info-panel">
-                    <h1 id="hero-title">Welcome</h1>
-                    <div class="info-meta" id="info-meta"></div>
-                    <p id="hero-desc">Your personal TV experience</p>
-                    <button class="hero-btn" id="hero-play">&#9654; Play</button>
-                </div>
-                <div class="row">
-                    <h2>Continue Watching</h2>
-                    <div class="row-items" id="home-continue"></div>
-                </div>
-                <div class="row">
-                    <h2>Recently Added</h2>
-                    <div class="row-items" id="home-recent"></div>
+            <!-- The home screen is a launcher, not a library: big tiles you
+                 aim a remote at, like a phone's home screen. The menu bar is
+                 hidden while it is up, because the tiles are the menu. -->
+            <section id="home-panel" class="tab-panel active">
+                <div class="app-grid" id="app-grid">
+                    <button class="app-tile" data-tab="media">
+                        <span class="tile-icon">&#127916;</span>
+                        <span class="tile-label">Media</span>
+                    </button>
+                    <button class="app-tile" data-tab="live">
+                        <span class="tile-icon">&#128250;</span>
+                        <span class="tile-label">Live TV</span>
+                    </button>
+                    <button class="app-tile" data-tab="emulation">
+                        <span class="tile-icon">&#127918;</span>
+                        <span class="tile-label">Games</span>
+                    </button>
+                    <button class="app-tile" data-tab="cameras">
+                        <span class="tile-icon">&#128249;</span>
+                        <span class="tile-label">Cameras</span>
+                    </button>
+                    <button class="app-tile" data-tab="youtube">
+                        <span class="tile-icon">&#9654;</span>
+                        <span class="tile-label">YouTube</span>
+                    </button>
+                    <button class="app-tile" data-tab="apps">
+                        <span class="tile-icon">&#127760;</span>
+                        <span class="tile-label">Apps</span>
+                    </button>
+                    <button class="app-tile" data-action="open-settings">
+                        <span class="tile-icon">&#9881;</span>
+                        <span class="tile-label">Settings</span>
+                    </button>
                 </div>
             </section>
 
             <section id="media-panel" class="tab-panel">
+                <div class="hero-background hidden" id="hero-bg"></div>
+                <div class="info-panel" id="info-panel">
+                    <h1 id="hero-title">Media</h1>
+                    <div class="info-meta" id="info-meta"></div>
+                    <p id="hero-desc">Pick something to watch</p>
+                    <button class="hero-btn" id="hero-play">&#9654; Play</button>
+                </div>
                 <div class="row">
                     <h2>Recently Added</h2>
                     <div class="row-items" id="recently-added"></div>

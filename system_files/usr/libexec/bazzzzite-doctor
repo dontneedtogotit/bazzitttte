@@ -74,15 +74,74 @@ else
 fi
 
 section "Services"
+# journalctl -u does not follow alias symlinks: display-manager.service is an
+# alias for the real unit (plasmalogin.service here), and every log line is
+# filed under that real name, so a journal hint naming the alias silently
+# matches nothing. systemctl resolves it, so ask it for the unit's own Id.
 for unit in bazzzzite-tv-bridge bazzzzite-cecd bazzzzite-ydotoold display-manager; do
+    real=$(systemctl show -p Id --value "$unit" 2>/dev/null)
+    real=${real:-$unit}
+    label="$unit"
+    [[ "$real" != "$unit" && "$real" != "${unit}.service" ]] && label="$unit -> $real"
     state=$(systemctl is-active "$unit" 2>/dev/null)
     if [[ "$state" == "active" ]]; then
-        pass "$unit"
+        pass "$label"
     else
         fail "$unit is ${state:-missing}"
-        note "journalctl -u $unit -b | tail -20"
+        note "journalctl -u $real -b | tail -20"
     fi
 done
+
+section "Autologin"
+# The TV shell is a display-manager session, so autologin is what starts it.
+# Which manager is running decides where the drop-in has to live: a current
+# Kinoite/Bazzite base ships plasma-login-manager (/etc/plasmalogin.conf.d) and
+# ignores /etc/sddm.conf.d entirely.
+dm_path=$(systemctl show -p ExecStart --value display-manager.service 2>/dev/null \
+    | sed -n 's/.*path=\([^ ;]*\).*/\1/p' | head -1)
+dm=$(basename "${dm_path:-unknown}")
+case "$dm" in
+    plasmalogin) dm_conf=/etc/plasmalogin.conf.d; dm_main=/etc/plasmalogin.conf ;;
+    sddm)        dm_conf=/etc/sddm.conf.d;        dm_main=/etc/sddm.conf ;;
+    *)           dm_conf=""; dm_main="" ;;
+esac
+if [[ -z "$dm_conf" ]]; then
+    warn "unrecognised display manager: ${dm_path:-none found}"
+    note "autologin can only be checked for plasmalogin or sddm"
+else
+    pass "display manager: $dm ($dm_path)"
+    dm_unit=$(systemctl show -p Id --value display-manager.service 2>/dev/null)
+    note "unit: ${dm_unit:-unknown} -- journalctl -u ${dm_unit:-plasmalogin} -b"
+    drop="${dm_conf}/zzz-bazzzzite-autologin.conf"
+    if [[ -f "$drop" ]]; then
+        if grep -q '^Session=bazzzzite-tv.desktop$' "$drop"; then
+            pass "autologin drop-in in place ($drop)"
+            note "user: $(sed -n 's/^User=//p' "$drop")"
+        else
+            fail "$drop does not select bazzzzite-tv.desktop"
+        fi
+    else
+        fail "no autologin drop-in in $dm_conf -- the TV boots to a greeter"
+        note "journalctl -u bazzzzite-autologin-setup -b | tail -20"
+        for other in /etc/plasmalogin.conf.d /etc/sddm.conf.d; do
+            [[ "$other" != "$dm_conf" && -f "$other/zzz-bazzzzite-autologin.conf" ]] &&
+                note "it is in $other instead, which $dm never reads"
+        done
+    fi
+    # Anything sorting after ours, or the main file if this build reads it last,
+    # can quietly win the Session key back.
+    conflict=$(grep -lE '^[[:space:]]*Session[[:space:]]*=[[:space:]]*[^[:space:]]' \
+        "$dm_conf"/*.conf "$dm_main" 2>/dev/null | grep -v "zzz-bazzzzite-autologin.conf$" || true)
+    if [[ -n "$conflict" ]]; then
+        warn "these also set Session= and may override the drop-in:"
+        while read -r f; do [[ -n "$f" ]] && note "$f: $(grep -hE '^[[:space:]]*Session[[:space:]]*=' "$f" | tr -d ' ')"; done <<<"$conflict"
+    fi
+fi
+if pgrep -x cage >/dev/null 2>&1; then
+    pass "the TV session (cage) is running"
+else
+    fail "cage is not running -- no TV shell on screen"
+fi
 
 section "Remote (HDMI-CEC)"
 if [[ -e /dev/cec0 ]]; then

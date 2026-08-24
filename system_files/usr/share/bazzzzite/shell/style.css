@@ -178,7 +178,9 @@ main#content {
     display: block;
 }
 
-#hero {
+/* The hero backdrop and info panel live in the media library now that the
+   home screen is a launcher, so the positioning context moves with them. */
+#media-panel {
     position: relative;
 }
 
@@ -799,4 +801,74 @@ main#content {
     color: var(--text-secondary);
     font-size: calc(0.75rem * var(--scale));
     text-align: right;
+}
+
+
+/* ---------------------------------------------------------------------------
+   Home screen launcher
+
+   The tiles are the home screen's entire menu, so the menu bar is hidden while
+   home is up. Sizes here are deliberately not multiplied by --scale: the html
+   element is already transform: scale()d by that same variable, so scaling the
+   metrics again would compound it.
+   --------------------------------------------------------------------------- */
+
+body.home-active .nav-items {
+    display: none;
+}
+
+#home-panel.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 150px);
+}
+
+.app-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 28px;
+    width: 100%;
+    max-width: 1180px;
+}
+
+.app-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    aspect-ratio: 4 / 3;
+    padding: 18px;
+    background: var(--bg-secondary);
+    border: 2px solid transparent;
+    border-radius: 18px;
+    color: var(--text-primary);
+    font-family: inherit;
+    cursor: pointer;
+    transition: transform 0.18s, background 0.18s, border-color 0.18s;
+}
+
+.tile-icon {
+    font-size: 3.4em;
+    line-height: 1;
+}
+
+.tile-label {
+    font-size: 1.15em;
+    letter-spacing: 0.5px;
+}
+
+.app-tile:hover {
+    background: var(--bg-hover);
+}
+
+/* Focus has to read from a couch, not a desk: the tile grows, takes the accent
+   border and lifts off the background. Hover alone is useless with a remote. */
+.app-tile:focus {
+    outline: none;
+    background: var(--bg-hover);
+    border-color: var(--accent);
+    transform: scale(1.08);
+    box-shadow: 0 0 0 4px rgba(229, 9, 20, 0.35), 0 18px 40px rgba(0, 0, 0, 0.6);
 }

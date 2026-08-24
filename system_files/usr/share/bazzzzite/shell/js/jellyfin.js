@@ -117,15 +117,10 @@ const Jellyfin = {
         });
     },
 
-    // Home and Media both surface these rows, in their own containers.
-    renderContinueWatching(items) {
-        this.renderRow('continue-watching', items);
-        this.renderRow('home-continue', items);
-    },
-    renderRecentlyAdded(items) {
-        this.renderRow('recently-added', items);
-        this.renderRow('home-recent', items);
-    },
+    // These live in the Media panel only. Home is a launcher now, so the
+    // duplicate home-continue / home-recent containers it used to hold are gone.
+    renderContinueWatching(items) { this.renderRow('continue-watching', items); },
+    renderRecentlyAdded(items) { this.renderRow('recently-added', items); },
     renderMovies(items) { this.renderRow('movies-row', items); },
     renderShows(items) { this.renderRow('shows-row', items, 'series'); },
 

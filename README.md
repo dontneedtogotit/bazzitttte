@@ -8,7 +8,7 @@ Derived from [Bazzite Desktop (KDE)](https://github.com/ublue-os/bazzite) and pu
 
 A **real TV operating system** that replaces your TV's dead smart features and Kodi-on-KDE with a purpose-built 10-foot interface:
 
-- **Kodi-style 10-foot interface** — sidebar menu, fanart backdrops, info panel
+- **10-foot launcher interface** — app-grid home screen, fanart backdrops, info panel
 - **Cage** kiosk compositor locks down the display
 - **Chromium** kiosk renders a Netflix-style TV shell
 - **Jellyfin** media server for your local library
@@ -32,7 +32,7 @@ A **real TV operating system** that replaces your TV's dead smart features and K
 ## What's baked in
 
 - **Base:** `ghcr.io/ublue-os/bazzite:stable` (KDE Plasma Wayland, Intel open-source drivers)
-- **TV Shell:** Cage + Chromium kiosk, Kodi Estuary-style custom interface
+- **TV Shell:** Cage + Chromium kiosk, custom app-grid launcher + media browser
 - **Video:** MPV with VA-API hardware decoding, WebSocket IPC for shell control
 - **Media Server:** Jellyfin (auto-starts, firewall opened for LAN)
 - **Remote:** libcec + CEC daemon translating Samsung remote buttons to shell input
@@ -76,14 +76,17 @@ ujust bazzzzite-iptv-update
 
 ### Interface
 
-The shell follows Kodi's Estuary layout:
+**Home is a launcher**, laid out like a phone or tablet home screen: a grid of
+large tiles (Media, Live TV, Games, Cameras, YouTube, Apps, Settings) sized to be
+read and aimed at from the couch. The focused tile grows and takes an accent
+border. Arrows move around the grid, **OK** opens a tile, **Back** returns to it
+from anywhere.
 
-- **Sidebar menu** down the left (Home, Media, Live TV, Games, Cameras, YouTube, Apps)
-- **Fanart backdrop** of whatever is focused, dimmed behind the UI
-- **Info panel** showing title, year, rating, runtime and plot, updating as you move
-
-Navigation matches Kodi: **Up/Down** moves through the menu, **Right** enters the
-content, and **Left** from the first item in a row returns to the menu.
+Inside a tile you get the media layout — a menu bar across the top, horizontal
+rows of artwork, a fanart backdrop of whatever is focused, and an info panel
+showing title, year, rating, runtime and plot. There, **Up/Down** moves between
+rows, **Left** from the start of a row returns to the menu bar, and **Right**
+from the menu bar re-enters the content.
 
 ### Remote Control
 

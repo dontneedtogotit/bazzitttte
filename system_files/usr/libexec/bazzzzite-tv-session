@@ -5,6 +5,28 @@
 # provides XDG_RUNTIME_DIR, the session D-Bus, and seat/DRM access. Launching
 # the compositor from a root system service via runuser cannot provide those,
 # which is why that approach failed to start Cage at all.
-set -euo pipefail
+#
+# Autologin sets Relogin=true, so a session that exits is started again at once:
+# anything that kills Cage in milliseconds -- a flag this build doesn't take, no
+# DRM device -- becomes a boot loop showing nothing and logging nothing worth
+# reading. Report the exit status and hold before handing the session back, so
+# the loop is slow enough to interrupt and the journal names the cause.
+set -uo pipefail
 
-exec /usr/bin/cage -s -- /usr/libexec/bazzzzite-tv-shell-inner
+/usr/bin/cage -s -- /usr/libexec/bazzzzite-tv-shell-inner &
+cage_pid=$!
+trap 'kill -TERM "$cage_pid" 2>/dev/null || true' TERM INT HUP
+
+status=0
+wait "$cage_pid" || status=$?
+if (( status > 128 )); then
+    # Interrupted by a signal we forwarded on; let Cage finish shutting down.
+    wait "$cage_pid" 2>/dev/null || status=$?
+fi
+trap - TERM INT HUP
+
+if (( status != 0 )); then
+    echo "TV session: cage exited with status ${status}" >&2
+    sleep 5
+fi
+exit "$status"

@@ -27,9 +27,10 @@ set_governor() {
 
 case "${1:-status}" in
     start)
-        # Killing Cage on its own does not hold: sddm autologin has
-        # Relogin=true, so the TV session comes straight back. Stopping the
-        # display manager takes the compositor with it and keeps it down.
+        # Killing Cage on its own does not hold: the display manager's
+        # autologin has Relogin=true, so the TV session comes straight back.
+        # Stopping the display manager takes the compositor with it and keeps
+        # it down.
         if cage_running; then
             echo "Stopping the TV session..."
             systemctl stop display-manager.service 2>/dev/null || true
