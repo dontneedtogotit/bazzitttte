@@ -138,6 +138,9 @@ def start_mpv(url=""):
         "--input-ipc-server=" + MPV_SOCK,
         "--hwdec=auto",
         "--vo=gpu",
+        # Cap YouTube/yt-dlp picks at 1080p so the NUC isn't handed 4K/AV1 it
+        # can't decode; ignored for non-ytdl (local/Jellyfin) URLs.
+        "--ytdl-format=bestvideo[height<=1080]+bestaudio/best[height<=1080]",
     ]
     if url:
         cmd.append(url)
@@ -370,16 +373,21 @@ async def handle_ws_message(ws, data):
     elif action == "yt_play":
         url = payload.get("url", "")
         if not url:
+            await ws.send_json({"action": "error", "payload": {"message": "no url"}})
             return
         try:
             res = subprocess.run(
                 ["/usr/libexec/bazzzzite-yt", "play", url],
-                capture_output=True, text=True, timeout=15
+                capture_output=True, text=True, timeout=30
             )
             stream_url = res.stdout.strip()
-            if stream_url:
+            if stream_url.startswith("http"):
                 start_mpv(stream_url)
                 await ws.send_json({"action": "mpv_status", "payload": {"status": "started"}})
+            else:
+                detail = (res.stderr or res.stdout or "yt-dlp returned nothing").strip()
+                await ws.send_json({"action": "error", "payload": {
+                    "message": "YouTube playback failed: " + detail[:200]}})
         except Exception as e:
             await ws.send_json({"action": "error", "payload": {"message": str(e)}})
 

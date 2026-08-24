@@ -43,6 +43,10 @@ else:
             echo '{"error": "no url"}'
             exit 1
         fi
-        yt-dlp -g -f "bestvideo[height<=1080]+bestaudio/best[height<=1080]" "$URL" 2>"$ERR_FILE" | head -1
+        # Hand the URL to mpv and let its built-in yt-dlp do the extraction.
+        # The old approach ran `yt-dlp -g ... | head -1`, which dropped the
+        # audio stream and failed silently whenever format selection missed;
+        # mpv handles MergedFormat selection (with audio) itself.
+        echo "$URL"
         ;;
 esac

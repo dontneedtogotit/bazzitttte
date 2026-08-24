@@ -1,12 +1,15 @@
 :root {
-    --bg-primary: #141414;
-    --bg-secondary: #1f1f1f;
-    --bg-hover: #2a2a2a;
-    --text-primary: #ffffff;
-    --text-secondary: #b3b3b3;
-    --accent: #e50914;
+    --bg-primary: #0b0b0f;
+    --bg-secondary: #16161c;
+    --bg-hover: #23232c;
+    --text-primary: #f5f5f7;
+    --text-secondary: #a0a0ab;
+    --accent: #ff3b30;
+    --accent-2: #ff6a3d;
+    --accent-grad: linear-gradient(135deg, #ff3b30, #ff6a3d);
     --focus: #ffffff;
-    --focus-shadow: 0 0 0 3px var(--accent);
+    --focus-shadow: 0 0 0 3px rgba(255, 59, 48, 0.9);
+    --radius: 14px;
     --scale: 1;
 }
 
@@ -20,9 +23,14 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: var(--bg-primary);
+    background:
+        radial-gradient(1200px 800px at 80% -10%, rgba(255, 59, 48, 0.12), transparent 60%),
+        radial-gradient(1000px 700px at -10% 110%, rgba(255, 106, 61, 0.10), transparent 55%),
+        var(--bg-primary);
     color: var(--text-primary);
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     transform: scale(var(--scale));
     transform-origin: top left;
 }
@@ -33,6 +41,7 @@ html, body {
     display: flex;
     flex-direction: row;
     position: relative;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.25), transparent 240px);
 }
 
 /* Kodi-style fanart: a dimmed backdrop of whatever is focused, behind all UI. */
@@ -65,12 +74,13 @@ header#topbar {
     flex-direction: column;
     justify-content: space-between;
     align-items: stretch;
-    width: calc(230px * var(--scale));
+    width: calc(240px * var(--scale));
     flex: 0 0 auto;
     padding: calc(28px * var(--scale)) 0;
-    background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(6px);
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.35));
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
     position: relative;
     z-index: 100;
 }
@@ -85,8 +95,11 @@ header .left {
 .logo {
     padding: 0 calc(22px * var(--scale));
     font-size: 1.5em;
-    font-weight: bold;
-    color: var(--accent);
+    font-weight: 800;
+    background: var(--accent-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
     letter-spacing: 2px;
 }
 
@@ -105,7 +118,8 @@ header .left {
     padding: calc(12px * var(--scale)) calc(22px * var(--scale));
     text-align: left;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    border-radius: 0 10px 10px 0;
+    transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.18s;
 }
 
 .nav-btn:hover, .nav-btn.active {
@@ -117,9 +131,10 @@ header .left {
 /* Focus is the cursor on a TV, so it must read louder than "active". */
 .nav-btn:focus {
     outline: none;
-    color: var(--text-primary);
-    background: var(--accent);
-    border-left-color: var(--focus);
+    color: #fff;
+    background: var(--accent-grad);
+    border-left-color: transparent;
+    box-shadow: 0 6px 20px rgba(255, 59, 48, 0.45);
 }
 
 header .right {
@@ -261,20 +276,29 @@ main#content {
 }
 
 .hero-btn {
-    background: var(--accent);
+    background: var(--accent-grad);
     color: white;
     border: none;
     padding: 12px 32px;
     font-size: 1.2em;
-    border-radius: 4px;
+    font-weight: 600;
+    border-radius: 10px;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 10px;
+    box-shadow: 0 8px 24px rgba(255, 59, 48, 0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.hero-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(255, 59, 48, 0.5);
 }
 
 .hero-btn:focus {
-    outline: var(--focus-shadow);
+    outline: none;
+    box-shadow: var(--focus-shadow), 0 12px 30px rgba(255, 59, 48, 0.5);
 }
 
 .row {
@@ -309,16 +333,23 @@ main#content {
     width: 200px;
     height: 300px;
     background: var(--bg-secondary);
-    border-radius: 8px;
+    border-radius: var(--radius);
     overflow: hidden;
     cursor: pointer;
     position: relative;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    animation: cardIn 0.35s ease both;
+}
+
+.item:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.55);
 }
 
 .item:focus {
-    transform: scale(1.08);
-    box-shadow: var(--focus-shadow);
+    transform: scale(1.08) translateY(-4px);
+    box-shadow: var(--focus-shadow), 0 18px 40px rgba(0, 0, 0, 0.6);
     outline: none;
     z-index: 10;
 }
@@ -327,6 +358,7 @@ main#content {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    border-radius: var(--radius);
 }
 
 .item .item-title {
@@ -372,13 +404,17 @@ main#content {
 }
 
 .overlay-content {
-    background: var(--bg-secondary);
+    background: rgba(22, 22, 28, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     padding: 40px;
-    border-radius: 12px;
+    border-radius: 18px;
     max-width: 600px;
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
 }
 
 .overlay-content h2 {
@@ -453,17 +489,19 @@ main#content {
 }
 
 .search-btn {
-    background: var(--accent);
+    background: var(--accent-grad);
     border: none;
     color: white;
     padding: 12px 24px;
     font-size: 1em;
-    border-radius: 6px;
+    font-weight: 600;
+    border-radius: 10px;
     cursor: pointer;
 }
 
 .search-btn:focus {
-    outline: var(--focus-shadow);
+    outline: none;
+    box-shadow: var(--focus-shadow);
 }
 
 .update-actions {
@@ -840,35 +878,45 @@ body.home-active .nav-items {
     gap: 14px;
     aspect-ratio: 4 / 3;
     padding: 18px;
-    background: var(--bg-secondary);
-    border: 2px solid transparent;
-    border-radius: 18px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    border-radius: 22px;
     color: var(--text-primary);
     font-family: inherit;
     cursor: pointer;
-    transition: transform 0.18s, background 0.18s, border-color 0.18s;
+    transition: transform 0.18s, background 0.18s, border-color 0.18s, box-shadow 0.18s;
 }
 
 .tile-icon {
     font-size: 3.4em;
     line-height: 1;
+    filter: drop-shadow(0 6px 14px rgba(255, 59, 48, 0.35));
 }
 
 .tile-label {
     font-size: 1.15em;
     letter-spacing: 0.5px;
+    font-weight: 600;
 }
 
 .app-tile:hover {
-    background: var(--bg-hover);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
 /* Focus has to read from a couch, not a desk: the tile grows, takes the accent
    border and lifts off the background. Hover alone is useless with a remote. */
 .app-tile:focus {
     outline: none;
-    background: var(--bg-hover);
+    background: linear-gradient(160deg, rgba(255, 59, 48, 0.22), rgba(255, 106, 61, 0.10));
     border-color: var(--accent);
     transform: scale(1.08);
-    box-shadow: 0 0 0 4px rgba(229, 9, 20, 0.35), 0 18px 40px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 0 4px rgba(255, 59, 48, 0.35), 0 18px 40px rgba(0, 0, 0, 0.6);
 }
+
+@keyframes cardIn {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+#home-panel.active { animation: cardIn 0.4s ease both; }

@@ -32,6 +32,16 @@ const YouTube = {
             const el = window.tvApp.createItem(v.title, v.thumbnail || v.title[0], v.url);
             el.dataset.type = 'youtube';
             el.dataset.url = v.url;
+            // YouTube blocks hotlinking thumbnails, so fall back to a gradient
+            // title card instead of a broken image.
+            const img = el.querySelector('img');
+            if (img) {
+                img.addEventListener('error', () => {
+                    img.remove();
+                    el.style.background = 'linear-gradient(135deg, #ff3b30, #ff6a3d)';
+                    el.style.color = '#fff';
+                });
+            }
             container.appendChild(el);
         });
     }

@@ -123,6 +123,9 @@ class TVApp {
 
     handleBridgeMessage(data) {
         switch (data.action) {
+            case 'error':
+                this.showError((data.payload && data.payload.message) || 'Error');
+                break;
             case 'mpv_status':
                 this.mpvConnected = data.payload.status === 'running';
                 break;
@@ -210,6 +213,23 @@ class TVApp {
         if (payload.action === 'keydown') {
             this.handleKeyDown(key);
         }
+    }
+
+    showError(msg) {
+        let t = document.getElementById('toast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'toast';
+            t.style.cssText = 'position:fixed;bottom:48px;left:50%;transform:translateX(-50%);' +
+                'background:rgba(0,0,0,.88);color:#fff;padding:14px 22px;border-radius:10px;' +
+                'z-index:9999;font-size:1.1em;max-width:80%;text-align:center;' +
+                'opacity:0;transition:opacity .25s ease;pointer-events:none;';
+            document.body.appendChild(t);
+        }
+        t.textContent = msg;
+        t.style.opacity = '1';
+        clearTimeout(this._toastTimer);
+        this._toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 5000);
     }
 
     setupNavigation() {

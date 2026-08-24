@@ -24,8 +24,14 @@ systemctl set-default graphical.target
 # --skip-unavailable and were being dropped on every build without a trace:
 # Jellyfin ships as the jellyfin.container quadlet instead, and cec-client
 # comes from libcec.
-dnf5 install -y cage chromium mpv libcec ffmpeg yt-dlp ydotool \
+dnf5 install -y cage chromium mpv libcec ffmpeg yt-dlp ydotool python3-pip \
     python3-websockets python3-aiohttp wireplumber
+
+# YouTube breaks yt-dlp's extractor constantly and the dnf package lags, so the
+# dnf copy alone leaves playback dead. Track upstream with pip, which is what
+# playback actually relies on. Non-fatal: if the network is down the build still
+# ships a (possibly stale) dnf yt-dlp rather than failing.
+pip3 install --upgrade yt-dlp || true
 
 # The TV shell launches a chromium binary, but Fedora's package names it
 # chromium-browser, not chromium. Guarantee /usr/bin/chromium resolves to it so
