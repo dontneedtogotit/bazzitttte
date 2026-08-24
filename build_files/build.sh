@@ -27,6 +27,13 @@ systemctl set-default graphical.target
 dnf5 install -y cage chromium mpv libcec ffmpeg yt-dlp ydotool \
     python3-websockets python3-aiohttp wireplumber
 
+# The TV shell launches a chromium binary, but Fedora's package names it
+# chromium-browser, not chromium. Guarantee /usr/bin/chromium resolves to it so
+# the kiosk command works regardless of how the package names the binary.
+if ! command -v chromium >/dev/null 2>&1 && command -v chromium-browser >/dev/null 2>&1; then
+    ln -sf "$(command -v chromium-browser)" /usr/bin/chromium
+fi
+
 # Nice-to-haves: the TV still works without any of them, so tolerate absence.
 dnf5 install -y --skip-unavailable retroarch dolphin-emu \
     lm_sensors smartmontools gamemode igt-gpu-tools \

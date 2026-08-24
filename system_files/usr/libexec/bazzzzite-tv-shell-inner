@@ -18,7 +18,22 @@ systemctl --user start graphical-session.target 2>/dev/null || true
 CACHE_DIR="${XDG_RUNTIME_DIR:-/tmp}/bazzzzite-shell-cache"
 rm -rf "$CACHE_DIR"
 
-exec /usr/bin/chromium \
+# Fedora's chromium package installs the binary as chromium-browser, not
+# chromium, so hardcoding /usr/bin/chromium launches nothing and Cage sits on a
+# black screen. Resolve whichever name the package actually provides.
+CHROMIUM=""
+for candidate in chromium chromium-browser google-chrome google-chrome-stable chrome; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+        CHROMIUM="$(command -v "$candidate")"
+        break
+    fi
+done
+if [[ -z "$CHROMIUM" ]]; then
+    echo "TV shell: no chromium/chrome binary found on PATH" >&2
+    exit 1
+fi
+
+exec "$CHROMIUM" \
     --disk-cache-dir="$CACHE_DIR" \
     --kiosk --noerrdialogs --disable-infobars \
     --disable-features=Translate \
