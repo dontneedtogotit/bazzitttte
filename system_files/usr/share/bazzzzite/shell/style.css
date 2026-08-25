@@ -927,6 +927,35 @@ main#content {
     box-shadow: 0 0 0 4px rgba(54, 198, 224, 0.35), 0 18px 40px rgba(0, 0, 0, 0.6);
 }
 
+.store-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-bottom: 10px;
+}
+
+.store-btn {
+    background: var(--bg-hover);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    padding: 14px 20px;
+    font-size: 1.05em;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.store-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.store-btn:focus {
+    outline: none;
+    background: var(--accent-grad);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(54, 198, 224, 0.4);
+}
+
 @keyframes cardIn {
     from { opacity: 0; transform: translateY(14px) scale(0.98); }
     to   { opacity: 1; transform: translateY(0) scale(1); }

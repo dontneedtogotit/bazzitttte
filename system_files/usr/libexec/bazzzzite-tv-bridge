@@ -202,6 +202,41 @@ def set_volume(direction):
     return "ok"
 
 
+# Curated Flatpak catalog for the on-TV app store. Flatpaks cannot be baked into
+# the bootc image, so they install at runtime; the bridge reports which are
+# present and launches them in the user's graphical session.
+APP_CATALOG = [
+    {"id": "com.spotify.Client", "name": "Spotify", "desc": "Music streaming", "icon": "\U0001F3B5"},
+    {"id": "tv.kodi.Kodi", "name": "Kodi", "desc": "Media center", "icon": "\U0001F4FA"},
+    {"id": "org.videolan.VLC", "name": "VLC", "desc": "Media player", "icon": "\U0001F3AC"},
+    {"id": "io.mpv.mpv", "name": "mpv", "desc": "Video player", "icon": "\U0001F39E"},
+    {"id": "org.mozilla.firefox", "name": "Firefox", "desc": "Web browser", "icon": "\U0001F310"},
+    {"id": "com.google.Chrome", "name": "Chrome", "desc": "Web browser", "icon": "\U0001F310"},
+    {"id": "org.libretro.RetroArch", "name": "RetroArch", "desc": "Emulator frontend", "icon": "\U0001F3AE"},
+    {"id": "com.obsproject.Studio", "name": "OBS Studio", "desc": "Streaming & recording", "icon": "\U0001F3A5"},
+    {"id": "com.valvesoftware.Steam", "name": "Steam", "desc": "Game library", "icon": "\U0001F3AE"},
+    {"id": "org.gnome.Calculator", "name": "Calculator", "desc": "Calculator", "icon": "\U0001F9EE"},
+]
+
+
+def installed_flatpaks():
+    try:
+        out = subprocess.run(["flatpak", "info", "--system", "--columns=application"],
+                             capture_output=True, text=True, timeout=10).stdout
+        return set(out.split())
+    except Exception:
+        return set()
+
+
+def running_flatpaks():
+    try:
+        out = subprocess.run(["flatpak", "ps", "--columns=application"],
+                             capture_output=True, text=True, timeout=10).stdout
+        return set(out.split())
+    except Exception:
+        return set()
+
+
 def launch_youtube():
     # VacuumTube connects to the same Cage compositor as the shell and stacks
     # on top of it, so quitting it reveals the shell again. The CEC daemon
@@ -615,6 +650,61 @@ async def handle_ws_message(ws, data):
             await ws.send_json({"action": "cam_settings", "payload": {key: value}})
         else:
             await ws.send_json({"action": "error", "payload": {"message": "key required"}})
+
+    elif action == "app_store_list":
+        inst = installed_flatpaks()
+        run = running_flatpaks()
+        apps = []
+        for a in APP_CATALOG:
+            state = "available"
+            if a["id"] in inst:
+                state = "running" if a["id"] in run else "installed"
+            apps.append({**a, "state": state})
+        await ws.send_json({"action": "app_store_list", "payload": {"apps": apps}})
+
+    elif action == "app_store_install":
+        app_id = payload.get("id", "")
+        if not app_id:
+            await ws.send_json({"action": "error", "payload": {"message": "no app id"}})
+            return
+        # The first-boot installer adds flathub, but the store must not depend on
+        # it having run, so ensure the remote exists before installing.
+        subprocess.run(["flatpak", "remote-add", "--system", "--if-not-exists",
+                        "flathub", "https://dl.flathub.org/repo/flathub.flatpakrepo"],
+                       capture_output=True, text=True)
+        subprocess.Popen(["flatpak", "install", "--system", "--noninteractive",
+                          "--assumeyes", "flathub", app_id])
+        await ws.send_json({"action": "app_store_status", "payload": {"id": app_id, "status": "installing"}})
+
+    elif action == "app_store_uninstall":
+        app_id = payload.get("id", "")
+        if not app_id:
+            await ws.send_json({"action": "error", "payload": {"message": "no app id"}})
+            return
+        subprocess.Popen(["flatpak", "uninstall", "--system", "--noninteractive",
+                          "--assumeyes", app_id])
+        await ws.send_json({"action": "app_store_status", "payload": {"id": app_id, "status": "uninstalling"}})
+
+    elif action == "app_store_open":
+        app_id = payload.get("id", "")
+        if not app_id:
+            await ws.send_json({"action": "error", "payload": {"message": "no app id"}})
+            return
+        if app_id not in installed_flatpaks():
+            await ws.send_json({"action": "error", "payload": {"message": "not installed"}})
+            return
+        user = session_user()
+        if not user:
+            await ws.send_json({"action": "error", "payload": {"message": "no user session"}})
+            return
+        res = subprocess.run(
+            ["systemctl", "--user", "-M", "{}@".format(user.pw_name), "start",
+             "bazzzzite-app@{}".format(app_id)],
+            capture_output=True, text=True)
+        if res.returncode != 0:
+            await ws.send_json({"action": "error", "payload": {"message": "failed: " + (res.stderr or res.stdout).strip()}})
+        else:
+            await ws.send_json({"action": "app_store_status", "payload": {"id": app_id, "status": "opening"}})
 
     else:
         await ws.send_json({"action": "error", "payload": {"message": "unknown action"}})

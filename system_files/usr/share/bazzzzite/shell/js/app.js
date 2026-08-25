@@ -161,6 +161,9 @@ class TVApp {
                     Profiles.render(data.payload);
                 }
                 break;
+            case 'app_store_list':
+                this.renderStore(data.payload.apps || []);
+                break;
             case 'voice_status':
                 Settings.updateVoiceStatus(data.payload.running);
                 break;
@@ -653,6 +656,15 @@ class TVApp {
         // On home the tiles are the menu, so the bar is hidden behind them.
         document.body.classList.toggle('home-active', tab === 'home');
 
+        // YouTube now defaults to VacuumTube (launches over the shell); the
+        // in-tab search is the lightweight mpv fallback for when it's closed.
+        if (tab === 'youtube' && this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({action: 'launch_app', payload: {app: 'youtube-tv'}}));
+        }
+        if (tab === 'store') {
+            this.loadStore();
+        }
+
         if (tab === 'home' || focusPanel) {
             const first = this.getFirstFocusable();
             if (first) {
@@ -751,6 +763,23 @@ class TVApp {
             case 'os-rollback':
                 Updates.rollback();
                 break;
+            case 'install':
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({action: 'app_store_install', payload: {id: item.dataset.id}}));
+                    setTimeout(() => this.loadStore(), 5000);
+                }
+                break;
+            case 'open':
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({action: 'app_store_open', payload: {id: item.dataset.id}}));
+                }
+                break;
+            case 'uninstall':
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({action: 'app_store_uninstall', payload: {id: item.dataset.id}}));
+                    setTimeout(() => this.loadStore(), 5000);
+                }
+                break;
         }
     }
 
@@ -803,6 +832,34 @@ class TVApp {
             el.dataset.type = app.type;
             el.dataset.app = app.app || '';
             container.appendChild(el);
+        });
+    }
+
+    loadStore() {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({action: 'app_store_list'}));
+        }
+    }
+
+    renderStore(apps) {
+        const container = document.getElementById('store-items');
+        if (!container) return;
+        container.innerHTML = '';
+        (apps || []).forEach(a => {
+            const mk = (action, label) => {
+                const b = document.createElement('button');
+                b.className = 'setting-item store-btn';
+                b.dataset.action = action;
+                b.dataset.id = a.id;
+                b.textContent = a.icon + ' ' + a.name + ' — ' + label;
+                return b;
+            };
+            if (a.state === 'available') {
+                container.appendChild(mk('install', 'Install'));
+            } else {
+                container.appendChild(mk('open', 'Open'));
+                container.appendChild(mk('uninstall', 'Remove'));
+            }
         });
     }
 

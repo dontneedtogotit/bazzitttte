@@ -1,0 +1,9 @@
+[Unit]
+Description=Bazzzzite app %I
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/flatpak run %I
+Restart=no
