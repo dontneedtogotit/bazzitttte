@@ -603,6 +603,7 @@ class TVApp {
                 this.switchTab(focused.dataset.tab, true);
             } else if (focused.dataset.action === 'open-settings') {
                 document.getElementById('settings-overlay').classList.remove('hidden');
+                this.refreshSettingsStatus();
             }
             return;
         }
@@ -643,6 +644,7 @@ class TVApp {
             return;
         } else if (focused.id === 'settings-btn') {
             document.getElementById('settings-overlay').classList.remove('hidden');
+            this.refreshSettingsStatus();
         } else if (focused.id === 'close-settings') {
             document.getElementById('settings-overlay').classList.add('hidden');
         }
@@ -731,6 +733,16 @@ class TVApp {
         });
     }
 
+    // Pull the live on/off state for the Feature toggles so their labels are
+    // correct the moment Settings opens (the persisted setting can lag reality).
+    refreshSettingsStatus() {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({action: 'voice_status'}));
+            this.ws.send(JSON.stringify({action: 'rygel_status'}));
+            this.ws.send(JSON.stringify({action: 'game_mode_status'}));
+        }
+    }
+
     executeSetting(action) {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
         
@@ -757,13 +769,23 @@ class TVApp {
                 this.launchApp('edid');
                 break;
             case 'voice-toggle':
-                this.ws.send(JSON.stringify({action: 'voice_status'}));
+                this.ws.send(JSON.stringify({action: 'voice_toggle'}));
                 break;
             case 'game-mode-toggle':
-                this.ws.send(JSON.stringify({action: 'game_mode_status'}));
+                this.ws.send(JSON.stringify({action: 'game_mode_toggle'}));
                 break;
             case 'dlna-toggle':
-                this.ws.send(JSON.stringify({action: 'rygel_status'}));
+                this.ws.send(JSON.stringify({action: 'dlna_toggle'}));
+                break;
+            case 'profiles':
+                document.getElementById('profile-overlay').classList.remove('hidden');
+                if (window.Profiles) Profiles.load();
+                break;
+            case 'ui-reload':
+                this.ws.send(JSON.stringify({action: 'ui_reload'}));
+                break;
+            case 'ui-reset':
+                this.ws.send(JSON.stringify({action: 'ui_reset'}));
                 break;
             case 'os-update':
                 document.getElementById('settings-overlay').classList.add('hidden');

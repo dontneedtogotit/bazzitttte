@@ -384,11 +384,9 @@ async def handle_ws_message(ws, data):
         await ws.send_json({"action": "game_mode", "payload": {"enabled": False}})
 
     elif action == "game_mode_status":
-        try:
-            res = subprocess.run(["/usr/libexec/bazzzzite-game-mode", "status"], capture_output=True, text=True, timeout=5)
-            await ws.send_json({"action": "game_mode", "payload": {"output": res.stdout}})
-        except Exception as e:
-            await ws.send_json({"action": "game_mode", "payload": {"error": str(e)}})
+        # Game mode is enabled when the TV compositor (Cage) is stopped.
+        cage = subprocess.run(["pgrep", "-x", "cage"], capture_output=True).returncode == 0
+        await ws.send_json({"action": "game_mode", "payload": {"enabled": not cage}})
 
     elif action == "yt_search":
         query = payload.get("query", "")
@@ -469,6 +467,35 @@ async def handle_ws_message(ws, data):
             await ws.send_json({"action": "rygel_status", "payload": {"running": running}})
         except Exception:
             await ws.send_json({"action": "rygel_status", "payload": {"running": False}})
+
+    elif action == "voice_toggle":
+        running = subprocess.run(["systemctl", "is-active", "bazzzzite-voice.service"],
+                                 capture_output=True, text=True).stdout.strip() == "active"
+        subprocess.Popen(["systemctl", "stop" if running else "start", "bazzzzite-voice.service"])
+        await ws.send_json({"action": "voice_status", "payload": {"running": not running}})
+
+    elif action == "dlna_toggle":
+        running = subprocess.run(["systemctl", "is-active", "bazzzzite-rygel.service"],
+                                 capture_output=True, text=True).stdout.strip() == "active"
+        subprocess.Popen(["systemctl", "stop" if running else "start", "bazzzzite-rygel.service"])
+        await ws.send_json({"action": "rygel_status", "payload": {"running": not running}})
+
+    elif action == "game_mode_toggle":
+        cage = subprocess.run(["pgrep", "-x", "cage"], capture_output=True).returncode == 0
+        enabled = not cage
+        subprocess.Popen(["/usr/libexec/bazzzzite-game-mode", "stop" if enabled else "start"])
+        await ws.send_json({"action": "game_mode", "payload": {"enabled": not enabled}})
+
+    elif action == "ui_reload":
+        subprocess.Popen(["systemctl", "restart", "display-manager.service"])
+        await ws.send_json({"action": "ui_reload", "payload": {"status": "reloading"}})
+
+    elif action == "ui_reset":
+        # Drop any /var shell override so the bridge serves the built-in UI.
+        subprocess.run(["/usr/libexec/bazzzzite-shell-update", "--reset"],
+                       capture_output=True, text=True)
+        subprocess.Popen(["systemctl", "restart", "display-manager.service"])
+        await ws.send_json({"action": "ui_reset", "payload": {"status": "reset"}})
 
     elif action == "get_settings":
         await ws.send_json({"action": "settings", "payload": settings})
