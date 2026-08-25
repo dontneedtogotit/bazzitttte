@@ -787,6 +787,11 @@ class TVApp {
             case 'ui-reset':
                 this.ws.send(JSON.stringify({action: 'ui_reset'}));
                 break;
+            case 'exit-desktop':
+                // Close the shell; the Bazzite desktop is underneath, and the
+                // launcher icon brings the TV interface back.
+                this.ws.send(JSON.stringify({action: 'shell_exit'}));
+                break;
             case 'os-update':
                 document.getElementById('settings-overlay').classList.add('hidden');
                 document.getElementById('update-overlay').classList.remove('hidden');

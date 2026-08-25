@@ -114,11 +114,11 @@ else
     note "unit: ${dm_unit:-unknown} -- journalctl -u ${dm_unit:-plasmalogin} -b"
     drop="${dm_conf}/zzz-bazzzzite-autologin.conf"
     if [[ -f "$drop" ]]; then
-        if grep -q '^Session=bazzzzite-tv.desktop$' "$drop"; then
+        if grep -q '^Session=plasma.desktop$' "$drop"; then
             pass "autologin drop-in in place ($drop)"
             note "user: $(sed -n 's/^User=//p' "$drop")"
         else
-            fail "$drop does not select bazzzzite-tv.desktop"
+            fail "$drop does not select plasma.desktop"
         fi
     else
         fail "no autologin drop-in in $dm_conf -- the TV boots to a greeter"
@@ -137,10 +137,10 @@ else
         while read -r f; do [[ -n "$f" ]] && note "$f: $(grep -hE '^[[:space:]]*Session[[:space:]]*=' "$f" | tr -d ' ')"; done <<<"$conflict"
     fi
 fi
-if pgrep -x cage >/dev/null 2>&1; then
-    pass "the TV session (cage) is running"
+if pgrep -f "chromium.*localhost:8080" >/dev/null 2>&1; then
+    pass "the TV shell (chromium kiosk) is running over the desktop"
 else
-    fail "cage is not running -- no TV shell on screen"
+    fail "TV shell is not running -- the desktop has no TV interface on top"
 fi
 
 section "Remote (HDMI-CEC)"

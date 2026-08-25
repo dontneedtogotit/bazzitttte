@@ -237,6 +237,16 @@ def running_flatpaks():
         return set()
 
 
+GOVERNOR_PATH = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+
+
+def current_governor():
+    try:
+        return Path(GOVERNOR_PATH).read_text().strip()
+    except OSError:
+        return "unknown"
+
+
 def launch_youtube():
     # VacuumTube connects to the same Cage compositor as the shell and stacks
     # on top of it, so quitting it reveals the shell again. The CEC daemon
@@ -384,9 +394,10 @@ async def handle_ws_message(ws, data):
         await ws.send_json({"action": "game_mode", "payload": {"enabled": False}})
 
     elif action == "game_mode_status":
-        # Game mode is enabled when the TV compositor (Cage) is stopped.
-        cage = subprocess.run(["pgrep", "-x", "cage"], capture_output=True).returncode == 0
-        await ws.send_json({"action": "game_mode", "payload": {"enabled": not cage}})
+        # Game mode means the performance governor. The TV shell lives inside
+        # the regular desktop session now, so whether a compositor process is
+        # running is no longer any kind of signal.
+        await ws.send_json({"action": "game_mode", "payload": {"enabled": current_governor() == "performance"}})
 
     elif action == "yt_search":
         query = payload.get("query", "")
@@ -481,10 +492,16 @@ async def handle_ws_message(ws, data):
         await ws.send_json({"action": "rygel_status", "payload": {"running": not running}})
 
     elif action == "game_mode_toggle":
-        cage = subprocess.run(["pgrep", "-x", "cage"], capture_output=True).returncode == 0
-        enabled = not cage
-        subprocess.Popen(["/usr/libexec/bazzzzite-game-mode", "stop" if enabled else "start"])
-        await ws.send_json({"action": "game_mode", "payload": {"enabled": not enabled}})
+        enabling = current_governor() != "performance"
+        subprocess.Popen(["/usr/libexec/bazzzzite-game-mode",
+                          "start" if enabling else "stop"])
+        await ws.send_json({"action": "game_mode", "payload": {"enabled": enabling}})
+
+    elif action == "shell_exit":
+        # Close the TV shell to reveal the desktop beneath it. It comes back
+        # from the launcher icon ("Bazzzzite TV Shell") or at next login.
+        subprocess.run(["pkill", "-f", "chromium.*localhost:8080"], capture_output=True)
+        await ws.send_json({"action": "shell_exit", "payload": {"status": "exited"}})
 
     elif action == "ui_reload":
         subprocess.Popen(["systemctl", "restart", "display-manager.service"])

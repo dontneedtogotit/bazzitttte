@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Bazzzzite TV Shell
+Comment=Return to the full-screen TV interface
+Exec=/usr/libexec/bazzzzite-tv-shell-inner
+TryExec=/usr/libexec/bazzzzite-tv-shell-inner
+Icon=video-display
+Terminal=false
+Categories=AudioVideo;Video;TV;

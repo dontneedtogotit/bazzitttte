@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Bazzzzite TV Shell
+Comment=Full-screen TV interface over the desktop
+Exec=/usr/libexec/bazzzzite-tv-shell-inner
+TryExec=/usr/libexec/bazzzzite-tv-shell-inner
+Terminal=false
+X-KDE-autostart-phase=2
