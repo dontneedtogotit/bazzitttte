@@ -4,11 +4,11 @@
     --bg-hover: #23232c;
     --text-primary: #f5f5f7;
     --text-secondary: #a0a0ab;
-    --accent: #ff3b30;
-    --accent-2: #ff6a3d;
-    --accent-grad: linear-gradient(135deg, #ff3b30, #ff6a3d);
+    --accent: #2aa9c6;
+    --accent-2: #36c6e0;
+    --accent-grad: linear-gradient(135deg, #2aa9c6, #36c6e0);
     --focus: #ffffff;
-    --focus-shadow: 0 0 0 3px rgba(255, 59, 48, 0.9);
+    --focus-shadow: 0 0 0 3px rgba(54, 198, 224, 0.9);
     --radius: 14px;
     --scale: 1;
 }
@@ -56,7 +56,7 @@ html, body {
 }
 
 #fanart.visible {
-    opacity: 0.35;
+    opacity: 0.5;
 }
 
 #fanart::after {
@@ -110,22 +110,40 @@ header .left {
 }
 
 .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: calc(14px * var(--scale));
     background: transparent;
     border: none;
-    border-left: 3px solid transparent;
     color: var(--text-secondary);
     font-size: 1.15em;
-    padding: calc(12px * var(--scale)) calc(22px * var(--scale));
+    padding: calc(12px * var(--scale)) calc(20px * var(--scale));
     text-align: left;
     cursor: pointer;
-    border-radius: 0 10px 10px 0;
-    transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.18s;
+    border-radius: 10px;
+    transition: background 0.18s, color 0.18s, transform 0.18s;
 }
 
-.nav-btn:hover, .nav-btn.active {
+.nav-icon {
+    font-size: 1.35em;
+    width: 1.4em;
+    text-align: center;
+    flex: 0 0 auto;
+}
+
+.nav-label {
+    font-weight: 600;
+}
+
+.nav-btn:hover {
     color: var(--text-primary);
-    border-left-color: var(--accent);
     background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-btn.active {
+    color: #fff;
+    background: rgba(42, 169, 198, 0.18);
+    box-shadow: inset 4px 0 0 var(--accent);
 }
 
 /* Focus is the cursor on a TV, so it must read louder than "active". */
@@ -133,8 +151,7 @@ header .left {
     outline: none;
     color: #fff;
     background: var(--accent-grad);
-    border-left-color: transparent;
-    box-shadow: 0 6px 20px rgba(255, 59, 48, 0.45);
+    box-shadow: 0 6px 20px rgba(54, 198, 224, 0.45);
 }
 
 header .right {
@@ -348,8 +365,8 @@ main#content {
 }
 
 .item:focus {
-    transform: scale(1.08) translateY(-4px);
-    box-shadow: var(--focus-shadow), 0 18px 40px rgba(0, 0, 0, 0.6);
+    transform: scale(1.06) translateY(-4px);
+    box-shadow: 0 0 0 3px #fff, 0 18px 40px rgba(0, 0, 0, 0.6);
     outline: none;
     z-index: 10;
 }
@@ -851,15 +868,11 @@ main#content {
    metrics again would compound it.
    --------------------------------------------------------------------------- */
 
-body.home-active .nav-items {
-    display: none;
-}
+/* The left menu (Kodi-style) stays visible on every tab, including home. */
+/* body.home-active .nav-items { display: none; } */
 
 #home-panel.active {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: calc(100vh - 150px);
+    display: block;
 }
 
 .app-grid {
@@ -890,7 +903,7 @@ body.home-active .nav-items {
 .tile-icon {
     font-size: 3.4em;
     line-height: 1;
-    filter: drop-shadow(0 6px 14px rgba(255, 59, 48, 0.35));
+    filter: drop-shadow(0 6px 14px rgba(42, 169, 198, 0.4));
 }
 
 .tile-label {
@@ -908,10 +921,10 @@ body.home-active .nav-items {
    border and lifts off the background. Hover alone is useless with a remote. */
 .app-tile:focus {
     outline: none;
-    background: linear-gradient(160deg, rgba(255, 59, 48, 0.22), rgba(255, 106, 61, 0.10));
+    background: linear-gradient(160deg, rgba(42, 169, 198, 0.22), rgba(54, 198, 224, 0.10));
     border-color: var(--accent);
     transform: scale(1.08);
-    box-shadow: 0 0 0 4px rgba(255, 59, 48, 0.35), 0 18px 40px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 0 4px rgba(54, 198, 224, 0.35), 0 18px 40px rgba(0, 0, 0, 0.6);
 }
 
 @keyframes cardIn {

@@ -38,7 +38,7 @@ const YouTube = {
             if (img) {
                 img.addEventListener('error', () => {
                     img.remove();
-                    el.style.background = 'linear-gradient(135deg, #ff3b30, #ff6a3d)';
+                    el.style.background = 'linear-gradient(135deg, #2aa9c6, #36c6e0)';
                     el.style.color = '#fff';
                 });
             }
