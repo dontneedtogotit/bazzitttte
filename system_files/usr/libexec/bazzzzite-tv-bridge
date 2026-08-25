@@ -660,7 +660,8 @@ async def handle_ws_message(ws, data):
             if a["id"] in inst:
                 state = "running" if a["id"] in run else "installed"
             apps.append({**a, "state": state})
-        await ws.send_json({"action": "app_store_list", "payload": {"apps": apps}})
+        ctx = payload.get("context", "store")
+        await ws.send_json({"action": "app_store_list", "payload": {"apps": apps, "context": ctx}})
 
     elif action == "app_store_install":
         app_id = payload.get("id", "")

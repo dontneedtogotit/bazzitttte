@@ -162,7 +162,11 @@ class TVApp {
                 }
                 break;
             case 'app_store_list':
-                this.renderStore(data.payload.apps || []);
+                if (data.payload.context === 'apps') {
+                    this.renderInstalledApps(data.payload.apps || []);
+                } else {
+                    this.renderStore(data.payload.apps || []);
+                }
                 break;
             case 'voice_status':
                 Settings.updateVoiceStatus(data.payload.running);
@@ -607,6 +611,7 @@ class TVApp {
             const url = focused.dataset.url || focused.dataset.src;
             const type = focused.dataset.type || 'video';
             const app = focused.dataset.app || '';
+            const flatpak = focused.dataset.flatpak || '';
             if (url) {
                 if (type === 'youtube') {
                     YouTube.play(url);
@@ -623,6 +628,8 @@ class TVApp {
                         Cameras.pip(name);
                     }
                 }
+            } else if (flatpak) {
+                this.openStoreApp(flatpak);
             } else if (app && type === 'app') {
                 this.launchApp(app);
             }
@@ -663,6 +670,9 @@ class TVApp {
         }
         if (tab === 'store') {
             this.loadStore();
+        }
+        if (tab === 'apps') {
+            this.loadApps();
         }
 
         if (tab === 'home' || focusPanel) {
@@ -789,6 +799,12 @@ class TVApp {
         }
     }
 
+    openStoreApp(id) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({action: 'app_store_open', payload: {id: id}}));
+        }
+    }
+
     startClock() {
         const update = () => {
             const now = new Date();
@@ -824,13 +840,32 @@ class TVApp {
             { name: 'Spotify', icon: 'S', url: 'https://open.spotify.com', type: 'web' },
             { name: 'File Manager', icon: '📁', app: 'filemanager', type: 'app' },
         ];
-        
+
         const container = document.getElementById('apps-row');
+        container.innerHTML = '';
         apps.forEach(app => {
             const el = this.createItem(app.name, app.icon || app.name[0], app.url || '');
             el.dataset.url = app.url || '';
             el.dataset.type = app.type;
             el.dataset.app = app.app || '';
+            container.appendChild(el);
+        });
+
+        // Surface installed Store apps as launch tiles too.
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({action: 'app_store_list', payload: {context: 'apps'}}));
+        }
+    }
+
+    renderInstalledApps(apps) {
+        const container = document.getElementById('apps-row');
+        if (!container) return;
+        container.querySelectorAll('[data-flatpak]').forEach(e => e.remove());
+        (apps || []).forEach(a => {
+            if (a.state === 'available') return;
+            const el = this.createItem(a.name, a.icon || a.name[0], '');
+            el.dataset.type = 'flatpak';
+            el.dataset.flatpak = a.id;
             container.appendChild(el);
         });
     }
